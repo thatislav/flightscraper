@@ -1,6 +1,6 @@
 """
 This module parse information about flight tickets from http://www.flybulgarien.dk/en/
-with parameters taken from user
+with parameters taken from user.
 """
 from datetime import datetime, timedelta
 import re
