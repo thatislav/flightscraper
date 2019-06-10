@@ -12,69 +12,70 @@ from texttable import Texttable
 DATA = dict()
 
 
-def check_dep_city(city_from_user):
+def get_city_with_regex(city):
+    return re.search('[A-Z]{3}', city).group()
+
+
+def get_cities_from_user(city_from_user):
     """Check for input accuracy of departure city"""
     response = requests.get('http://www.flybulgarien.dk/en/')
     parsed = html.fromstring(response.text)
     cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
-    cities_for_dep = [re.search('[A-Z]{3}', city).group() for city in cities_from_html]
+    cities_for_dep = [get_city_with_regex(city) for city in cities_from_html]
     while city_from_user.upper() not in cities_for_dep:
         city_from_user = input(
             ' - город введён неверно. Введите код города из списка: {}\n'.format(cities_for_dep))
     DATA['dep_city'] = city_from_user.upper()
-    r_new = requests.get('http://www.flybulgarien.dk/script/getcity/2-{}'.
-                         format(DATA['dep_city']))
+    r_new = requests.get('http://www.flybulgarien.dk/script/getcity/2-{[dep_city]}'.
+                         format(DATA))
     cities_for_arr = [city for city in r_new.json()]
     if not cities_for_arr:
-        print('\n..самолёты из {}, к сожалению, никуда не летают..'.
-              format(DATA['dep_city']))
-        check_dep_city(input('введите другой город: '))
-    # elif len(cities_for_arr) == 1:
-    #     DATA['arr_city'] = cities_for_arr[0]
-    #     print('\nПрекрасно! Самолётом из {0} можно добраться только до {1}.'
-    #           '\n2) город прибытия: {1}'.
-    #           format(DATA['dep_city'], DATA['arr_city']))
-    #     check_arr_city(DATA['arr_city'])
+        print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.
+              format(DATA))
+        get_cities_from_user(input('введите другой город: \n'))
+    elif len(cities_for_arr) == 1:
+        DATA['arr_city'] = cities_for_arr[0]
+        print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться только до {0[arr_city]}.'
+              '\n* город прибытия: {0[arr_city]}'.
+              format(DATA))
+        # check_arr_city(DATA['arr_city'])
     else:
         text = ' или '.join(cities_for_arr)
-        print('\nПрекрасно! Самолётом из {} можно добраться до {}. {}'.
-              format(DATA['dep_city'], text, 'Куда направляетесь?' if len(cities_for_arr) > 1 else ''))
-        city_from_user = input('\n2) город прибытия: ')
-        while not city_from_user in cities_for_arr:
-            print('asdasd')
-            city_from_user = input('\n2) город прибытия: ')
+        print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. Куда направляетесь?'.
+              format(DATA, text))
+        city_from_user = input('\n* город прибытия:\n')
+        while not city_from_user.upper() in cities_for_arr:
+            print(text)
+            city_from_user = input('\n* город прибытия: \n')
+        DATA['arr_city'] = city_from_user.upper()
 
 
-# def check_arr_city(city_from_user, list_of_cities):
-#     """Check for input accuracy of arrival city"""
-#     return city_from_user in list_of_cities
-#     r_new = requests.get('http://www.flybulgarien.dk/script/getcity/2-{}'.
-#                          format(DATA['dep_city']))
-#     cities_for_arr = [code for code in r_new.json()]
-#     while city_from_user.upper() not in cities_for_arr:
-#         city_from_user = input(
-#             ' - город введён неверно. Введите код города из списка: {}\n'.format(cities_for_arr)
-#         )
-#     DATA['arr_city'] = city_from_user.upper()
+def get_datetime_from_str(string):
+    try:
+        return datetime.strptime(string, '%a, %d %b %y %H:%M')
+    except ValueError:
+        try:
+            return datetime.strptime(string, '%a, %d %b %y')
+        except ValueError:
+            return datetime.strptime(string, '%Y,%m,%d')
 
 
 def available_dates(for_depart=True):
     """Pull out available dates"""
     if for_depart:  # Runs scenario for getting dates for departure
-        body = 'code1={0}&code2={1}'.format(DATA['dep_city'], DATA['arr_city'])
-        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        # make POST-request to site with selected cities, to know available dates
-        r_new = requests.post('http://www.flybulgarien.dk/script/getdates/2-departure',
-                              data=body, headers=headers)
-        raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', r_new.text))
-        dates_for_dep = \
-            [datetime.strptime(raw_date, '%Y,%m,%d') for raw_date in raw_dates_from_html].sort()
-        DATA['dates_for_dep'] = dates_for_dep
-        return dates_for_dep
+        if 'dates_for_dep' not in DATA.keys():
+            body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(DATA)
+            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+            # make POST-request to site with selected cities, to know available dates
+            r_new = requests.post('http://www.flybulgarien.dk/script/getdates/2-departure',
+                                  data=body, headers=headers)
+            raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', r_new.text))
+            dates_for_dep = [get_datetime_from_str(raw_date) for raw_date in raw_dates_from_html]
+            DATA['dates_for_dep'] = sorted(dates_for_dep)
+        return DATA['dates_for_dep']
     # Runs scenario for getting dates for arrive
-    dates_for_arr = [i for i in DATA['dates_for_dep'] if i >= DATA['dep_date']]
-    DATA['dates_for_arr'] = dates_for_arr
-    return dates_for_arr
+    DATA['dates_for_arr'] = [date for date in DATA['dates_for_dep'] if date >= DATA['dep_date']]
+    return DATA['dates_for_arr']
 
 
 def get_date_in_format(date_from_user):
@@ -86,6 +87,10 @@ def get_date_in_format(date_from_user):
             'Дата введена некорректно. Формат даты: "ДД.ММ.ГГГГ". Повторите ввод:\n'))
 
 
+def get_ddmmyyyy_from_datetime(date):
+    return datetime.strftime(date, '%d.%m.%Y')
+
+
 def check_dep_date(date_from_user):
     """Check if user's date suitable for choice for departure date"""
     verified_dep_date = get_date_in_format(date_from_user)
@@ -93,11 +98,11 @@ def check_dep_date(date_from_user):
     if verified_dep_date not in dates_for_dep:
         check_dep_date(input(
             ' - для выбора доступна любая из этих дат:\n{}\nКакую выберЕте?\n'.
-                format([datetime.strftime(date, '%d.%m.%Y') for date in dates_for_dep]))
+                format([get_ddmmyyyy_from_datetime(date) for date in dates_for_dep]))
         )
     else:
         DATA['dep_date'] = verified_dep_date
-        DATA['dep_date_for_url'] = datetime.strftime(DATA['dep_date'], '%d.%m.%Y')
+        DATA['dep_date_for_url'] = get_ddmmyyyy_from_datetime(DATA['dep_date'])
         print('\nСупер! Почти всё готово. Обратный билет будем брать?'
               '\nЕсли да - введите дату, если нет - нажмите Enter')
 
@@ -113,7 +118,7 @@ def check_arr_date(date_from_user):
         if verified_arr_date not in dates_for_arr:
             check_arr_date(input(
                 ' - выберите любую из этих дат:\n{}\n'.
-                    format([datetime.strftime(date, '%d.%m.%Y') for date in dates_for_arr])))
+                    format([get_ddmmyyyy_from_datetime(date) for date in dates_for_arr])))
         else:
             DATA['arr_date'] = verified_arr_date
             check_if_oneway_flight(one_way=False)
@@ -125,23 +130,22 @@ def check_if_oneway_flight(one_way=True):
     if one_way:
         DATA['arr_date_for_url'] = ''
         DATA['flag'] = 'ow'
-        DATA['arr_date'] = ''
+        # DATA['arr_date'] = ''
     else:
-        DATA['arr_date_for_url'] = '&rtdate=' + datetime.strftime(DATA['arr_date'], '%d.%m.%Y')
+        DATA['arr_date_for_url'] = '&rtdate=' + get_ddmmyyyy_from_datetime(DATA['arr_date'])
         DATA['flag'] = 'rt'
 
 
 # FIXME Program starts here
 print('\nСалют! Билеты на самолёт??\nПроще простого! Введите:\n')
-check_dep_city(input('*город отправления: '))
-check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ): '))
-check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ): '))
+get_cities_from_user(input('* город отправления:\n'))
+check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
+check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
 
 
-URL = 'https://apps.penguin.bg/fly/quote3.aspx?{4}=&lang=en&depdate={2}' \
-      '&aptcode1={0}{3}&aptcode2={1}&paxcount=1&infcount='.\
-    format(DATA['dep_city'], DATA['arr_city'], DATA['dep_date_for_url'],
-           DATA['arr_date_for_url'], DATA['flag'])
+URL = 'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en&depdate={0[dep_date_for_url]}' \
+      '&aptcode1={0[dep_city]}{0[arr_date_for_url]}&aptcode2={0[arr_city]}&paxcount=1&infcount='.\
+    format(DATA)
 R_FINAL = requests.get(URL)
 TREE = html.fromstring(R_FINAL.text)
 INFO_DEP = TREE.xpath('//tr[starts-with(@id, "flywiz_rinf")]')
@@ -169,11 +173,9 @@ def prepare_finishing_flight_info(flight):
     """Проверяем подходят ли данные о вылете под параметры юзера"""
     finished_flight_info = dict()
     # время взлета в формате datetime
-    finished_flight_info['dep_time'] = \
-        datetime.strptime(flight[0] + ' ' + flight[1], '%a, %d %b %y %H:%M')
+    finished_flight_info['dep_time'] = get_datetime_from_str(flight[0] + ' ' + flight[1])
     # время посадки в формате datetime
-    finished_flight_info['arr_time'] = \
-        datetime.strptime(flight[0] + ' ' + flight[2], '%a, %d %b %y %H:%M')
+    finished_flight_info['arr_time'] = get_datetime_from_str(flight[0] + ' ' + flight[2])
     # к дате посадки +1 день, если время взлёта позднее времени посадки
     if finished_flight_info['dep_time'] > finished_flight_info['arr_time']:
         finished_flight_info['arr_time'] += timedelta(days=1)
@@ -181,8 +183,8 @@ def prepare_finishing_flight_info(flight):
         finished_flight_info['arr_time'] - finished_flight_info['dep_time']
     finished_flight_info['price'] = float(flight[5].split()[1])
     finished_flight_info['currency'] = flight[5].split()[2]
-    finished_flight_info['from'] = re.search('[A-Z]{3}', flight[3]).group()
-    finished_flight_info['to'] = re.search('[A-Z]{3}', flight[4]).group()
+    finished_flight_info['from'] = get_city_with_regex(flight[3])
+    finished_flight_info['to'] = get_city_with_regex(flight[4])
     return finished_flight_info
 
 
@@ -209,9 +211,9 @@ def check_site_info(flight_info, price_info, relevant_list, all_list, return_fli
     for flight in prepared_flights_info:
         # если вылет подходит под запрос юзера,
         # сохраняем его в соотв-щий список relevant_list
-        if (re.search('[A-Z]{3}', flight[3]).group() == DATA['dep_city']) \
-                and (re.search('[A-Z]{3}', flight[4]).group() == DATA['arr_city'])\
-                and (datetime.strptime(flight[0], '%a, %d %b %y') == DATA['dep_date']):
+        if (get_city_with_regex(flight[3]) == DATA['dep_city']) \
+                and (get_city_with_regex(flight[4]) == DATA['arr_city'])\
+                and (get_datetime_from_str(flight[0]) == DATA['dep_date']):
             relevant_list.append(prepare_finishing_flight_info(flight))
         # если вылет не подходит под запрос юзера,
         # тоже сохраняем его, но уже в список всех вылетов all_list
@@ -228,8 +230,8 @@ def print_flights_table(flights_list, header, list_is_relevant=True):
     print(table_for_suitable_flights.draw())
 
 
-def pretty_time(time):
-    return datetime.strftime(time, '%H:%M %d.%m.%Y')
+def get_hhmm_ddmmyyyy_from_datetime(date):
+    return datetime.strftime(date, '%H:%M %d.%m.%Y')
 
 
 def show_suitable_flights(list_relevant, list_all, return_flight=False):
@@ -237,12 +239,12 @@ def show_suitable_flights(list_relevant, list_all, return_flight=False):
     # если подходящие вылеты были, выводим их на экран
     list_filtered = list()
     if list_relevant:
-        print('\nДля маршрута из {} в {} нашлось следующее:'.
-              format(DATA['dep_city'], DATA['arr_city']))
+        print('\nДля маршрута из {0[dep_city]} в {0[arr_city]} нашлось следующее:'.
+              format(DATA))
         header = 'Взлёт в:\tПосадка в:\tДлительность перелёта:\tЦена билета:'.split('\t')
         for flight in list_relevant:
-            flight_restruct = [pretty_time(flight['dep_time']),
-                               pretty_time(flight['arr_time']),
+            flight_restruct = [get_hhmm_ddmmyyyy_from_datetime(flight['dep_time']),
+                               get_hhmm_ddmmyyyy_from_datetime(flight['arr_time']),
                                flight['arr_time'] - flight['dep_time'],
                                str(flight['price']) + ' ' + flight['currency']]
             list_filtered.append(flight_restruct)
@@ -250,26 +252,26 @@ def show_suitable_flights(list_relevant, list_all, return_flight=False):
     # иначе выводим сообщение, что подходящих вылетов нет,
     # и на всякий выдаём инфу о всех предложенных сайтом вылетах
     else:
-        print('\nК сожалению, вылетов из {} в {} не нашлось.'
-              '\nНо это только пока, не отчаивайтесь ;)'
-              '\nЗато есть вот такие варианты:\n'.
-              format(DATA['dep_city'], DATA['arr_city']))
-        header = \
-            'Откуда:\tВзлёт в:\tКуда:\tПосадка в:\tДлительность перелёта:\tЦена билета:'.split('\t')
-        for flight in list_all:
-            flight_restruct = [flight['from'],
-                               pretty_time(flight['dep_time']),
-                               flight['to'],
-                               pretty_time(flight['arr_time']),
-                               flight['arr_time'] - flight['dep_time'],
-                               str(flight['price']) + ' ' + flight['currency']]
-            list_filtered.append(flight_restruct)
-        print_flights_table(list_filtered, header, list_is_relevant=False)
+        print('\nК сожалению, вылетов из {0[dep_city]} в {0[arr_city]} не нашлось.'
+              '\nНо это только пока, не отчаивайтесь ;)'.format(DATA))
+        if list_all:
+            print('\nЗато есть вот такие варианты:\n')
+            header = \
+                'Откуда:\tВзлёт в:\tКуда:\tПосадка в:\tДлительность перелёта:\tЦена билета:'.split('\t')
+            for flight in list_all:
+                flight_restruct = [flight['from'],
+                                   get_hhmm_ddmmyyyy_from_datetime(flight['dep_time']),
+                                   flight['to'],
+                                   get_hhmm_ddmmyyyy_from_datetime(flight['arr_time']),
+                                   flight['arr_time'] - flight['dep_time'],
+                                   str(flight['price']) + ' ' + flight['currency']]
+                list_filtered.append(flight_restruct)
+            print_flights_table(list_filtered, header, list_is_relevant=False)
 
 
 check_site_info(INFO_DEP, PRICE_DEP, DEPARTURE_LIST_RELEVANT, DEPARTURE_LIST_ALL)
 show_suitable_flights(DEPARTURE_LIST_RELEVANT, DEPARTURE_LIST_ALL)
-if DATA['arr_date']:
+if 'arr_date' in DATA.keys():
     check_site_info(INFO_ARR, PRICE_ARR, ARRIVAL_LIST_RELEVANT, ARRIVAL_LIST_ALL,
                     return_flight=True)
     show_suitable_flights(ARRIVAL_LIST_RELEVANT, ARRIVAL_LIST_ALL, return_flight=True)
@@ -283,26 +285,27 @@ if DEPARTURE_LIST_RELEVANT and ARRIVAL_LIST_RELEVANT:
     for dep_flight in DEPARTURE_LIST_RELEVANT:
         for arr_flight in ARRIVAL_LIST_RELEVANT:
             if dep_flight['arr_time'] > arr_flight['dep_time']:
-                print('После посадки в {0} в {1} обратным рейсом в {2} улететь уже не успеете.'.
-                      format(DATA['dep_city'],
-                             pretty_time(dep_flight['arr_time']),
-                      pretty_time(arr_flight['dep_time'])))
+                print('После посадки в {0[dep_city]} в {1} '
+                      'обратным рейсом в {2} улететь уже не успеете.'.
+                      format(DATA,
+                             get_hhmm_ddmmyyyy_from_datetime(dep_flight['arr_time']),
+                             get_hhmm_ddmmyyyy_from_datetime(arr_flight['dep_time'])))
                 continue
             flight_dict = dict()
-            flight_dict['dep_time_tuda'] = pretty_time(dep_flight['dep_time'])
-            flight_dict['dep_time_obratno'] = pretty_time(arr_flight['dep_time'])
+            flight_dict['dep_time_to'] = get_hhmm_ddmmyyyy_from_datetime(dep_flight['dep_time'])
+            flight_dict['dep_time_from'] = get_hhmm_ddmmyyyy_from_datetime(arr_flight['dep_time'])
             flight_dict['v_polete'] = \
                 (dep_flight['arr_time'] - dep_flight['dep_time']) \
                 + (arr_flight['arr_time'] - arr_flight['dep_time'])
-            flight_dict['itog_price'] = \
+            flight_dict['full_price'] = \
                 str(dep_flight['price'] + arr_flight['price']) + ' ' + dep_flight['currency']
             FLIGHT_LIST_OF_DICTS.append(flight_dict)
     if FLIGHT_LIST_OF_DICTS:
-        SORTED_FLIGHT_LIST_OF_DICTS = sorted(FLIGHT_LIST_OF_DICTS, key=lambda k: k['itog_price'])
+        SORTED_FLIGHT_LIST_OF_DICTS = sorted(FLIGHT_LIST_OF_DICTS, key=lambda k: k['full_price'])
         SORTED_FLIGHT_LIST_OF_LISTS = \
             [[v for v in flight_d.values()] for flight_d in SORTED_FLIGHT_LIST_OF_DICTS]
-        header = 'Из {} в {}:\tНазад:\tИтого в полёте(ЧЧ:ММ):\tИтого цена:'.\
-            format(DATA['arr_city'], DATA['dep_city']).split('\t')
+        header = 'Из {0[arr_city]} в {0[dep_city]}:\tНазад:\tИтого в полёте(ЧЧ:ММ):\tИтого цена:'.\
+            format(DATA).split('\t')
         print_flights_table(SORTED_FLIGHT_LIST_OF_LISTS, header)
 
 # input('\n\n\nWait a minute...\n')
