@@ -98,7 +98,7 @@ def check_dep_date(date_from_user):
     if verified_dep_date not in dates_for_dep:
         check_dep_date(input(
             ' - для выбора доступна любая из этих дат:\n{}\nКакую выберЕте?\n'.
-                format([get_ddmmyyyy_from_datetime(date) for date in dates_for_dep]))
+            format([get_ddmmyyyy_from_datetime(date) for date in dates_for_dep]))
         )
     else:
         DATA['dep_date'] = verified_dep_date
@@ -118,7 +118,7 @@ def check_arr_date(date_from_user):
         if verified_arr_date not in dates_for_arr:
             check_arr_date(input(
                 ' - выберите любую из этих дат:\n{}\n'.
-                    format([get_ddmmyyyy_from_datetime(date) for date in dates_for_arr])))
+                format([get_ddmmyyyy_from_datetime(date) for date in dates_for_arr])))
         else:
             DATA['arr_date'] = verified_arr_date
             check_if_oneway_flight(one_way=False)
@@ -142,10 +142,9 @@ get_cities_from_user(input('* город отправления:\n'))
 check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
 check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
 
-
 R_FINAL = requests.get(
-    'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en&depdate={0[dep_date_for_url]}' \
-      '&aptcode1={0[dep_city]}{0[arr_date_for_url]}&aptcode2={0[arr_city]}&paxcount=1&infcount='.\
+    'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en&depdate={0[dep_date_for_url]}'
+    '&aptcode1={0[dep_city]}{0[arr_date_for_url]}&aptcode2={0[arr_city]}&paxcount=1&infcount='.
     format(DATA))
 TREE = html.fromstring(R_FINAL.text)
 INFO_DEP = TREE.xpath('//tr[starts-with(@id, "flywiz_rinf")]')
@@ -212,7 +211,7 @@ def check_site_info(flight_info, price_info, relevant_list, all_list, return_fli
         # если вылет подходит под запрос юзера,
         # сохраняем его в соотв-щий список relevant_list
         if (get_city_with_regex(flight[3]) == DATA['dep_city']) \
-                and (get_city_with_regex(flight[4]) == DATA['arr_city'])\
+                and (get_city_with_regex(flight[4]) == DATA['arr_city']) \
                 and (get_datetime_from_str(flight[0]) == DATA['dep_date']):
             relevant_list.append(prepare_finishing_flight_info(flight))
         # если вылет не подходит под запрос юзера,
@@ -221,7 +220,7 @@ def check_site_info(flight_info, price_info, relevant_list, all_list, return_fli
             all_list.append(prepare_finishing_flight_info(flight))
 
 
-def print_flights_table(flights_list, header, list_is_relevant=True):
+def print_flights_table(flights_list, header):
     table_for_suitable_flights = Texttable(max_width=100)
     table_for_suitable_flights.header(header)
     table_for_suitable_flights.add_rows(flights_list, header=False)
@@ -232,7 +231,7 @@ def get_hhmm_ddmmyyyy_from_datetime(date):
     return datetime.strftime(date, '%H:%M %d.%m.%Y')
 
 
-def show_suitable_flights(list_relevant, list_all, return_flight=False):
+def show_suitable_flights(list_relevant, list_all):
     """Проверяем, есть ли подходящие вылеты"""
     # если подходящие вылеты были, выводим их на экран
     list_filtered = list()
@@ -255,7 +254,8 @@ def show_suitable_flights(list_relevant, list_all, return_flight=False):
         if list_all:
             print('\nЗато есть вот такие варианты:\n')
             header = \
-                'Откуда:\tВзлёт в:\tКуда:\tПосадка в:\tДлительность перелёта:\tЦена билета:'.split('\t')
+                'Откуда:\tВзлёт в:\tКуда:\tПосадка в:\tДлительность перелёта:\tЦена билета:'.split(
+                    '\t')
             for flight in list_all:
                 flight_restruct = [flight['from'],
                                    get_hhmm_ddmmyyyy_from_datetime(flight['dep_time']),
@@ -264,7 +264,7 @@ def show_suitable_flights(list_relevant, list_all, return_flight=False):
                                    flight['arr_time'] - flight['dep_time'],
                                    str(flight['price']) + ' ' + flight['currency']]
                 list_filtered.append(flight_restruct)
-            print_flights_table(list_filtered, header, list_is_relevant=False)
+            print_flights_table(list_filtered, header)
 
 
 check_site_info(INFO_DEP, PRICE_DEP, DEPARTURE_LIST_RELEVANT, DEPARTURE_LIST_ALL)
@@ -272,7 +272,7 @@ show_suitable_flights(DEPARTURE_LIST_RELEVANT, DEPARTURE_LIST_ALL)
 if 'arr_date' in DATA.keys():
     check_site_info(INFO_ARR, PRICE_ARR, ARRIVAL_LIST_RELEVANT, ARRIVAL_LIST_ALL,
                     return_flight=True)
-    show_suitable_flights(ARRIVAL_LIST_RELEVANT, ARRIVAL_LIST_ALL, return_flight=True)
+    show_suitable_flights(ARRIVAL_LIST_RELEVANT, ARRIVAL_LIST_ALL)
 
 # если нашлись подходящие вылеты и ТУДА, и ОБРАТНО,
 # то считаем все возможные варианты пар ТУДА-ОБРАТНО,
@@ -292,7 +292,7 @@ if DEPARTURE_LIST_RELEVANT and ARRIVAL_LIST_RELEVANT:
             flight_dict = dict()
             flight_dict['dep_time_to'] = get_hhmm_ddmmyyyy_from_datetime(dep_flight['dep_time'])
             flight_dict['dep_time_from'] = get_hhmm_ddmmyyyy_from_datetime(arr_flight['dep_time'])
-            flight_dict['v_polete'] = \
+            flight_dict['duration'] = \
                 (dep_flight['arr_time'] - dep_flight['dep_time']) \
                 + (arr_flight['arr_time'] - arr_flight['dep_time'])
             flight_dict['full_price'] = \
@@ -302,7 +302,7 @@ if DEPARTURE_LIST_RELEVANT and ARRIVAL_LIST_RELEVANT:
         SORTED_FLIGHT_LIST_OF_DICTS = sorted(FLIGHT_LIST_OF_DICTS, key=lambda k: k['full_price'])
         SORTED_FLIGHT_LIST_OF_LISTS = \
             [[v for v in flight_d.values()] for flight_d in SORTED_FLIGHT_LIST_OF_DICTS]
-        header = 'Из {0[arr_city]} в {0[dep_city]}:\tНазад:\tИтого в полёте(ЧЧ:ММ):\tИтого цена:'.\
+        header = 'Из {0[arr_city]} в {0[dep_city]}:\tНазад:\tИтого в полёте(ЧЧ:ММ):\tИтого цена:'. \
             format(DATA).split('\t')
         print_flights_table(SORTED_FLIGHT_LIST_OF_LISTS, header)
 
