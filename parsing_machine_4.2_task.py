@@ -9,7 +9,7 @@ from lxml import html
 from texttable import Texttable
 
 
-DATA = dict()
+DATA = {'URL': 'http://www.flybulgarien.dk/'}
 
 
 def get_city_with_regex(city):
@@ -18,7 +18,7 @@ def get_city_with_regex(city):
 
 def get_cities_from_user(city_from_user):
     """Check for input accuracy of departure city"""
-    response = requests.get('http://www.flybulgarien.dk/en/')
+    response = requests.get('{[URL]}en/'.format(DATA))
     parsed = html.fromstring(response.text)
     cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
     cities_for_dep = [get_city_with_regex(city) for city in cities_from_html]
@@ -26,7 +26,7 @@ def get_cities_from_user(city_from_user):
         city_from_user = input(
             ' - город введён неверно. Введите код города из списка: {}\n'.format(cities_for_dep))
     DATA['dep_city'] = city_from_user.upper()
-    r_new = requests.get('http://www.flybulgarien.dk/script/getcity/2-{[dep_city]}'.
+    r_new = requests.get('{0[URL]}script/getcity/2-{0[dep_city]}'.
                          format(DATA))
     cities_for_arr = [city for city in r_new.json()]
     if not cities_for_arr:
@@ -67,7 +67,7 @@ def available_dates(for_depart=True):
             body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(DATA)
             headers = {'Content-Type': 'application/x-www-form-urlencoded'}
             # make POST-request to site with selected cities, to know available dates
-            r_new = requests.post('http://www.flybulgarien.dk/script/getdates/2-departure',
+            r_new = requests.post('{[URL]}script/getdates/2-departure'.format(DATA),
                                   data=body, headers=headers)
             raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', r_new.text))
             dates_for_dep = [get_datetime_from_str(raw_date) for raw_date in raw_dates_from_html]
@@ -143,10 +143,10 @@ check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
 check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
 
 
-URL = 'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en&depdate={0[dep_date_for_url]}' \
+R_FINAL = requests.get(
+    'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en&depdate={0[dep_date_for_url]}' \
       '&aptcode1={0[dep_city]}{0[arr_date_for_url]}&aptcode2={0[arr_city]}&paxcount=1&infcount='.\
-    format(DATA)
-R_FINAL = requests.get(URL)
+    format(DATA))
 TREE = html.fromstring(R_FINAL.text)
 INFO_DEP = TREE.xpath('//tr[starts-with(@id, "flywiz_rinf")]')
 PRICE_DEP = TREE.xpath('//tr[starts-with(@id, "flywiz_rprc")]')
@@ -224,9 +224,7 @@ def check_site_info(flight_info, price_info, relevant_list, all_list, return_fli
 def print_flights_table(flights_list, header, list_is_relevant=True):
     table_for_suitable_flights = Texttable(max_width=100)
     table_for_suitable_flights.header(header)
-    for flight in flights_list:
-        table_for_suitable_flights.add_row(flight)
-    # FIXME можно попробовать table_for_suitable_flights.add_rows(flights_list)
+    table_for_suitable_flights.add_rows(flights_list, header=False)
     print(table_for_suitable_flights.draw())
 
 
@@ -286,7 +284,7 @@ if DEPARTURE_LIST_RELEVANT and ARRIVAL_LIST_RELEVANT:
         for arr_flight in ARRIVAL_LIST_RELEVANT:
             if dep_flight['arr_time'] > arr_flight['dep_time']:
                 print('После посадки в {0[dep_city]} в {1} '
-                      'обратным рейсом в {2} улететь уже не успеете.'.
+                      'обратным рейсом в {2} улететь уже невозможно.'.
                       format(DATA,
                              get_hhmm_ddmmyyyy_from_datetime(dep_flight['arr_time']),
                              get_hhmm_ddmmyyyy_from_datetime(arr_flight['dep_time'])))
