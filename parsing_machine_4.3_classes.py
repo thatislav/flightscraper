@@ -4,6 +4,7 @@ with parameters taken from user
 """
 from datetime import datetime, timedelta
 import re
+import sys
 import requests
 from lxml import html
 from texttable import Texttable
@@ -22,10 +23,37 @@ class FlightSearch:
     def get_city_with_regex(self, city):
         return re.search('[A-Z]{3}', city).group()
 
+    def get_html_from_url(self, url, get=True, data=None, headers=None):
+        try:
+            if get:
+                response = requests.get(url)
+            else:
+                response = requests.post(url, data=data, headers=headers)
+        except:
+            print('Что-то с сайтом... Попробуйте позже')
+            sys.exit()
+        else:
+            if str(response.status_code) == '200':
+                return response
+            else:
+                print('Что-то с сайтом... Попробуйте позже')
+                sys.exit()
+
+    def get_parsed_info(self, response):
+        try:
+            parsed = html.fromstring(response.text)
+        except:
+            print('Что-то с парсингом... Попробуйте позже')
+            sys.exit()
+        else:
+            return parsed
+
     def get_cities_from_user(self, city_from_user):
         """Check for input accuracy of departure city"""
-        response = requests.get('{[URL]}en/'.format(self.DATA))
-        parsed = html.fromstring(response.text)
+        # response = requests.get('{[URL]}en/'.format(self.DATA))
+        # parsed = html.fromstring(response.text)
+        response = self.get_html_from_url('{[URL]}en/'.format(self.DATA))
+        parsed = self.get_parsed_info(response)
         cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
         cities_for_dep = [self.get_city_with_regex(city) for city in cities_from_html]
         while city_from_user.upper() not in cities_for_dep:
@@ -33,8 +61,7 @@ class FlightSearch:
                 ' - город введён неверно. Введите код города из списка: {}\n'.
                 format(cities_for_dep))
         self.DATA['dep_city'] = city_from_user.upper()
-        r_new = requests.get('{0[URL]}script/getcity/2-{0[dep_city]}'.
-                             format(self.DATA))
+        r_new = self.get_html_from_url('{0[URL]}script/getcity/2-{0[dep_city]}'.format(self.DATA))
         cities_for_arr = [city for city in r_new.json()]
         if not cities_for_arr:
             print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.
@@ -72,8 +99,9 @@ class FlightSearch:
                 body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(self.DATA)
                 headers = {'Content-Type': 'application/x-www-form-urlencoded'}
                 # make POST-request to site with selected cities, to know available dates
-                r_new = requests.post('{[URL]}script/getdates/2-departure'.format(self.DATA),
-                                      data=body, headers=headers)
+                r_new = self.get_html_from_url('{[URL]}script/getdates/2-departure'.
+                                               format(self.DATA),
+                                               get=False, data=body, headers=headers)
                 raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', r_new.text))
                 dates_for_dep = \
                     [self.get_datetime_from_str(raw_date) for raw_date in raw_dates_from_html]
@@ -240,12 +268,12 @@ class FlightSearch:
                 self.print_flights_table(list_filtered, header)
 
     def checking_everything(self):
-        r_final = requests.get(
+        r_final = self.get_html_from_url(
             'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en'
             '&depdate={0[dep_date_for_url]}&aptcode1={0[dep_city]}{0[arr_date_for_url]}'
             '&aptcode2={0[arr_city]}&paxcount=1&infcount='.
             format(self.DATA))
-        tree = html.fromstring(r_final.text)
+        tree = self.get_parsed_info(r_final)
         info_dep = tree.xpath('//tr[starts-with(@id, "flywiz_rinf")]')
         price_dep = tree.xpath('//tr[starts-with(@id, "flywiz_rprc")]')
         info_arr = tree.xpath('//tr[starts-with(@id, "flywiz_irinf")]')
