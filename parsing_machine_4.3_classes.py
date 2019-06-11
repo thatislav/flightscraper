@@ -302,13 +302,23 @@ class FlightSearch:
                     .format(self.DATA).split('\t')
                 self.print_flights_table(sorted_flight_list_of_lists, header)
 
+    def start(self):
+        self.get_cities_from_user(input('* город отправления:\n'))
+        self.check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
+        self.check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
+
+    def __str__(self):
+        self.checking_everything()
+        self.final_checking()
+        if self.departure_list_relevant:
+            return '\nСчастливого пути! :)'
+        else:
+            return '\nКто ищет, тот всегда найдёт! :)'
+
 
 if __name__ == '__main__':
 
     print('\nСалют! Билеты на самолёт??\nПроще простого! Введите:\n')
     checker = FlightSearch()
-    checker.get_cities_from_user(input('* город отправления:\n'))
-    checker.check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
-    checker.check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
-    checker.checking_everything()
-    checker.final_checking()
+    checker.start()
+    print(checker)
