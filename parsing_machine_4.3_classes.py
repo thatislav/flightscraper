@@ -20,8 +20,12 @@ class FlightSearch:
         # список (словарей) релевантных вылетов ОБРАТНО
         self.arrival_list_relevant = []
 
-    def get_city_with_regex(self, city):
-        return re.search('[A-Z]{3}', city).group()
+    def get_city_with_regex(self, city, search=True):
+        regex = re.compile(r'[A-Z]{3}')
+        if search:
+            return regex.search(city).group()
+        else:
+            return set(regex.findall(city))
 
     def get_html_from_url(self, url, get=True, data=None, headers=None):
         try:
@@ -43,45 +47,61 @@ class FlightSearch:
         try:
             parsed = html.fromstring(response.text)
         except:
-            print('Что-то с парсингом... Попробуйте позже')
+            print('Что-то с парсингом html-страницы... Обратитесь к администратору программы')
             sys.exit()
         else:
             return parsed
+        
+    # def get_arr_city_from_json(self, request):
+    #     try:
+    #         result = request.json()
+    #     except:
+    #
+    #     else:
+    #         return result
+
+    def checking
 
     def get_cities_from_user(self, city_from_user):
         """Check for input accuracy of departure city"""
-        # response = requests.get('{[URL]}en/'.format(self.DATA))
-        # parsed = html.fromstring(response.text)
-        response = self.get_html_from_url('{[URL]}en/'.format(self.DATA))
-        parsed = self.get_parsed_info(response)
+        get_request = self.get_html_from_url('{[URL]}en/'.format(self.DATA))
+        parsed = self.get_parsed_info(get_request)
         cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
         cities_for_dep = [self.get_city_with_regex(city) for city in cities_from_html]
         while city_from_user.upper() not in cities_for_dep:
             city_from_user = input(
-                ' - город введён неверно. Введите код города из списка: {}\n'.
+                ' - город введён неверно. Введите код города из списка:\n{}\n'.
                 format(cities_for_dep))
         self.DATA['dep_city'] = city_from_user.upper()
-        r_new = self.get_html_from_url('{0[URL]}script/getcity/2-{0[dep_city]}'.format(self.DATA))
-        cities_for_arr = [city for city in r_new.json()]
+        get_request = self.get_html_from_url('{0[URL]}script/getcity/2-{0[dep_city]}'.
+                                             format(self.DATA))
+        cities_for_arr = set(self.get_city_with_regex(get_request.text, search=False))
         if not cities_for_arr:
-            print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.
-                  format(self.DATA))
+            print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.format(self.DATA))
             self.get_cities_from_user(input('введите другой город: \n'))
-        elif len(cities_for_arr) == 1:
-            self.DATA['arr_city'] = cities_for_arr[0]
-            print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться только до {0[arr_city]}.'
-                  '\n* город прибытия: {0[arr_city]}'.
-                  format(self.DATA))
+        # elif len(cities_for_arr) == 1:
+        #     self.DATA['arr_city'] = cities_for_arr[0]
+        #     print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться только до {0[arr_city]}.'
+        #           '\n* город прибытия: {0[arr_city]}'.
+        #           format(self.DATA))
         else:
             text = ' или '.join(cities_for_arr)
             print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. '
-                  'Куда направляетесь?'.
-                  format(self.DATA, text))
-            city_from_user = input('\n* город прибытия:\n')
-            while not city_from_user.upper() in cities_for_arr:
-                print(text)
-                city_from_user = input('\n* город прибытия: \n')
-            self.DATA['arr_city'] = city_from_user.upper()
+                  .format(self.DATA, text))
+            if len(cities_for_arr) == 1:
+                another_arr_city = input('Если летим туда, нажмите Enter.'
+                                 '\nИначе выберите другой город из списка:\n{}'.
+                                 format(cities_for_dep))
+                if not another_arr_city:
+                    self.DATA['arr_city'] = text.upper()
+                else:
+                    # FIXME: GOTO line 69 ("while city_from_user.upper() not in cities_for_dep:..")
+            else:
+                city_from_user = input('\n* город прибытия:\n')
+                while not city_from_user.upper() in cities_for_arr:
+                    print(text)
+                    city_from_user = input('\n* город прибытия: \n')
+                self.DATA['arr_city'] = city_from_user.upper()
 
     def get_datetime_from_str(self, string):
         try:
@@ -98,11 +118,11 @@ class FlightSearch:
             if 'dates_for_dep' not in self.DATA.keys():
                 body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(self.DATA)
                 headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-                # make POST-request to site with selected cities, to know available dates
-                r_new = self.get_html_from_url('{[URL]}script/getdates/2-departure'.
+                # make post_request to site with selected cities, to know available dates
+                post_request = self.get_html_from_url('{[URL]}script/getdates/2-departure'.
                                                format(self.DATA),
                                                get=False, data=body, headers=headers)
-                raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', r_new.text))
+                raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', post_request.text))
                 dates_for_dep = \
                     [self.get_datetime_from_str(raw_date) for raw_date in raw_dates_from_html]
                 self.DATA['dates_for_dep'] = sorted(dates_for_dep)
