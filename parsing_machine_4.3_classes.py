@@ -159,7 +159,9 @@ class FlightSearch:
         """Checks for the presence of the input of arrival date"""
         if not date_from_user:
             print('Ок! One-way ticket!\nИтак, что мы имеем...')
-            self.check_if_oneway_flight()
+            print('\n===============..Минутчку, пожалст..====================')
+            self.DATA['arr_date_for_url'] = ''
+            self.DATA['flag'] = 'ow'
         else:
             verified_arr_date = self.get_date_in_format(date_from_user)
             dates_for_arr = self.available_dates(for_depart=False)
@@ -169,19 +171,10 @@ class FlightSearch:
                     format([self.get_ddmmyyyy_from_datetime(date) for date in dates_for_arr])))
             else:
                 self.DATA['arr_date'] = verified_arr_date
-                self.check_if_oneway_flight(one_way=False)
-
-    def check_if_oneway_flight(self, one_way=True):
-        """Checks if one-way flight and make some changes in main dict DATA for further using"""
-        print('\n===============..Минутчку, пожалст..====================')
-        if one_way:
-            self.DATA['arr_date_for_url'] = ''
-            self.DATA['flag'] = 'ow'
-            # self.DATA['arr_date'] = ''
-        else:
-            self.DATA['arr_date_for_url'] = \
-                '&rtdate=' + self.get_ddmmyyyy_from_datetime(self.DATA['arr_date'])
-            self.DATA['flag'] = 'rt'
+                print('\n===============..Минутчку, пожалст..====================')
+                self.DATA['arr_date_for_url'] = \
+                    '&rtdate=' + self.get_ddmmyyyy_from_datetime(self.DATA['arr_date'])
+                self.DATA['flag'] = 'rt'
 
     def change_data_dict(self):
         """Changes main dict DATA for return flight search"""
