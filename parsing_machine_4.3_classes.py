@@ -176,14 +176,13 @@ class FlightSearch:
                     '&rtdate=' + self.get_ddmmyyyy_from_datetime(self.DATA['arr_date'])
                 self.DATA['flag'] = 'rt'
 
-    # def change_data_dict(self):
-    #     """Changes main dict DATA for return flight search"""
-    #     self.DATA['dep_city'], self.DATA['arr_city'] = self.DATA['arr_city'], self.DATA['dep_city']
-    #     self.DATA['dep_date'], self.DATA['arr_date'] = self.DATA['arr_date'], self.DATA['dep_date']
-
     def prepare_finishing_flight_info(self, flight):
         """Checks if flight data getting from site is suitable for user's parameters"""
-        finished_flight_info = dict()
+        finished_flight_info = \
+            {'from': self.get_city_with_regex(flight[3]),
+             'to': self.get_city_with_regex(flight[4]),
+             'price': float(flight[5].split()[1]),
+             'currency': flight[5].split()[2]}
         # время взлета в формате datetime
         finished_flight_info['dep_time'] = \
             datetime.strptime(flight[0] + ' ' + flight[1], '%a, %d %b %y %H:%M')
@@ -195,22 +194,7 @@ class FlightSearch:
             finished_flight_info['arr_time'] += timedelta(days=1)
         finished_flight_info['duration'] = \
             finished_flight_info['arr_time'] - finished_flight_info['dep_time']
-        finished_flight_info['price'] = float(flight[5].split()[1])
-        finished_flight_info['currency'] = flight[5].split()[2]
-        finished_flight_info['from'] = self.get_city_with_regex(flight[3])
-        finished_flight_info['to'] = self.get_city_with_regex(flight[4])
         return finished_flight_info
-
-    def prepare_cities_and_dates(self, return_flight):
-        dep_city = lambda return_flight: self.DATA['arr_city'] \
-            if return_flight else self.DATA['dep_city']
-        arr_city = lambda return_flight: self.DATA['dep_city'] \
-            if return_flight else self.DATA['arr_city']
-        dep_date = lambda return_flight: self.DATA['arr_date'] \
-            if return_flight else self.DATA['dep_date']
-        arr_date = lambda return_flight: self.DATA['dep_date'] \
-            if return_flight else self.DATA['arr_date']
-        return dep_city, arr_city, dep_date, arr_date
 
     def check_site_info(self, flight_info, price_info, relevant_list, all_list,
                         return_flight=False):
