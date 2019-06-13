@@ -107,16 +107,6 @@ class FlightSearch:
                     city_from_user = input('\n* город прибытия: \n')
                 self.DATA['arr_city'] = city_from_user.upper()
 
-    def get_datetime_from_str(self, string):
-        """Converts str to datetime format by two ways"""
-        try:
-            return datetime.strptime(string, '%a, %d %b %y %H:%M')
-        except ValueError:
-            try:
-                return datetime.strptime(string, '%a, %d %b %y')
-            except ValueError:
-                return datetime.strptime(string, '%Y,%m,%d')
-
     def available_dates(self, for_depart=True):
         """Pulls out available dates"""
         if for_depart:  # Runs scenario for getting dates for departure
@@ -129,10 +119,11 @@ class FlightSearch:
                                                get=False, data=body, headers=headers)
                 raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', post_request.text))
                 dates_for_dep = \
-                    [self.get_datetime_from_str(raw_date) for raw_date in raw_dates_from_html]
+                    [datetime.strptime(raw_date, '%Y,%m,%d') for raw_date in raw_dates_from_html]
                 self.DATA['dates_for_dep'] = sorted(dates_for_dep)
             return self.DATA['dates_for_dep']
         # Runs scenario for getting dates for arrive
+        # Arrival dates coming from site are the same as departure dates
         self.DATA['dates_for_arr'] = \
             [date for date in self.DATA['dates_for_dep'] if date >= self.DATA['dep_date']]
         return self.DATA['dates_for_arr']
@@ -201,9 +192,11 @@ class FlightSearch:
         """Checks if flight data getting from site is suitable for user's parameters"""
         finished_flight_info = dict()
         # время взлета в формате datetime
-        finished_flight_info['dep_time'] = self.get_datetime_from_str(flight[0] + ' ' + flight[1])
+        finished_flight_info['dep_time'] = \
+            datetime.strptime(flight[0] + ' ' + flight[1], '%a, %d %b %y %H:%M')
         # время посадки в формате datetime
-        finished_flight_info['arr_time'] = self.get_datetime_from_str(flight[0] + ' ' + flight[2])
+        finished_flight_info['arr_time'] = \
+            datetime.strptime(flight[0] + ' ' + flight[2], '%a, %d %b %y %H:%M')
         # к дате посадки +1 день, если время взлёта позднее времени посадки
         if finished_flight_info['dep_time'] > finished_flight_info['arr_time']:
             finished_flight_info['arr_time'] += timedelta(days=1)
@@ -241,7 +234,7 @@ class FlightSearch:
             # сохраняем его в соотв-щий список relevant_list
             if (self.get_city_with_regex(flight[3]) == self.DATA['dep_city']) \
                     and (self.get_city_with_regex(flight[4]) == self.DATA['arr_city']) \
-                    and (self.get_datetime_from_str(flight[0]) == self.DATA['dep_date']):
+                    and (datetime.strptime(flight[0], '%a, %d %b %y') == self.DATA['dep_date']):
                 relevant_list.append(self.prepare_finishing_flight_info(flight))
             # если вылет не подходит под запрос юзера,
             # тоже сохраняем его, но уже в список всех вылетов all_list
