@@ -21,6 +21,7 @@ class FlightSearch:
         self.arrival_list_relevant = []
 
     def get_city_with_regex(self, city, search=True):
+        """Pulls city-code or codes with regex"""
         regex = re.compile(r'[A-Z]{3}')
         if search:
             return regex.search(city).group()
@@ -28,6 +29,7 @@ class FlightSearch:
             return set(regex.findall(city))
 
     def get_html_from_url(self, url, get=True, data=None, headers=None):
+        """Makes get or post request to url. Returns html-response"""
         try:
             if get:
                 response = requests.get(url)
@@ -44,6 +46,7 @@ class FlightSearch:
                 sys.exit()
 
     def get_parsed_info(self, response):
+        """Parses html and returns single document"""
         try:
             parsed = html.fromstring(response.text)
         except:
@@ -51,51 +54,52 @@ class FlightSearch:
             sys.exit()
         else:
             return parsed
-        
-    # def get_arr_city_from_json(self, request):
-    #     try:
-    #         result = request.json()
-    #     except:
-    #
-    #     else:
-    #         return result
 
-    def checking
-
-    def get_cities_from_user(self, city_from_user):
-        """Check for input accuracy of departure city"""
+    def get_dep_cities(self):
+        """Collects from site all available departure cities"""
         get_request = self.get_html_from_url('{[URL]}en/'.format(self.DATA))
         parsed = self.get_parsed_info(get_request)
         cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
         cities_for_dep = [self.get_city_with_regex(city) for city in cities_from_html]
-        while city_from_user.upper() not in cities_for_dep:
-            city_from_user = input(
-                ' - город введён неверно. Введите код города из списка:\n{}\n'.
-                format(cities_for_dep))
+        self.DATA['cities_for_dep'] = cities_for_dep
+
+    def checking_user_dep_city(self, city_from_user):
+        """Checks if user's dep city is in available dep-cities"""
+        while city_from_user.upper() not in self.DATA['cities_for_dep']:
+            city_from_user = input('Введите код города из списка:'
+                                   '\n{[cities_for_dep]}\n'.format(self.DATA))
         self.DATA['dep_city'] = city_from_user.upper()
+
+    def get_arr_cities(self):
+        """Checks where could to fly from chosen dep_city"""
         get_request = self.get_html_from_url('{0[URL]}script/getcity/2-{0[dep_city]}'.
                                              format(self.DATA))
         cities_for_arr = set(self.get_city_with_regex(get_request.text, search=False))
+        return cities_for_arr
+
+    def get_cities_from_user(self, city_from_user='plug'):
+        """Checks for input accuracy of departure city"""
+        if 'cities_for_dep' not in self.DATA:
+            self.get_dep_cities()
+        self.checking_user_dep_city(city_from_user)
+        cities_for_arr = self.get_arr_cities()
         if not cities_for_arr:
             print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.format(self.DATA))
+            self.DATA['cities_for_dep'].remove(self.DATA['dep_city'])
             self.get_cities_from_user(input('введите другой город: \n'))
-        # elif len(cities_for_arr) == 1:
-        #     self.DATA['arr_city'] = cities_for_arr[0]
-        #     print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться только до {0[arr_city]}.'
-        #           '\n* город прибытия: {0[arr_city]}'.
-        #           format(self.DATA))
         else:
             text = ' или '.join(cities_for_arr)
             print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. '
                   .format(self.DATA, text))
             if len(cities_for_arr) == 1:
-                another_arr_city = input('Если летим туда, нажмите Enter.'
-                                 '\nИначе выберите другой город из списка:\n{}'.
-                                 format(cities_for_dep))
-                if not another_arr_city:
+                another_city = input('Если летим туда, нажмите Enter.'
+                                 '\nИначе выберите другой город из списка:\n{}\n'.
+                                 format(self.DATA['cities_for_dep']))
+                if not another_city:
                     self.DATA['arr_city'] = text.upper()
+                    print('* город прибытия - {[arr_city]}'.format(self.DATA))
                 else:
-                    # FIXME: GOTO line 69 ("while city_from_user.upper() not in cities_for_dep:..")
+                    self.get_cities_from_user(another_city)
             else:
                 city_from_user = input('\n* город прибытия:\n')
                 while not city_from_user.upper() in cities_for_arr:
@@ -104,6 +108,7 @@ class FlightSearch:
                 self.DATA['arr_city'] = city_from_user.upper()
 
     def get_datetime_from_str(self, string):
+        """Converts str to datetime format by two ways"""
         try:
             return datetime.strptime(string, '%a, %d %b %y %H:%M')
         except ValueError:
@@ -113,7 +118,7 @@ class FlightSearch:
                 return datetime.strptime(string, '%Y,%m,%d')
 
     def available_dates(self, for_depart=True):
-        """Pull out available dates"""
+        """Pulls out available dates"""
         if for_depart:  # Runs scenario for getting dates for departure
             if 'dates_for_dep' not in self.DATA.keys():
                 body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(self.DATA)
@@ -133,7 +138,7 @@ class FlightSearch:
         return self.DATA['dates_for_arr']
 
     def get_date_in_format(self, date_from_user):
-        """Check for date input accuracy, and convert date into Datetime format"""
+        """Checks for date input accuracy, and convert date into Datetime format"""
         try:
             return datetime.strptime(date_from_user, '%d.%m.%Y')
         except ValueError:
@@ -141,10 +146,11 @@ class FlightSearch:
                 'Дата введена некорректно. Формат даты: "ДД.ММ.ГГГГ". Повторите ввод:\n'))
 
     def get_ddmmyyyy_from_datetime(self, date):
+        """Converts datetime to dd.mm.yyyy str-format"""
         return datetime.strftime(date, '%d.%m.%Y')
 
     def check_dep_date(self, date_from_user):
-        """Check if user's date suitable for choice for departure date"""
+        """Checks if user's date suitable for choice for departure date"""
         verified_dep_date = self.get_date_in_format(date_from_user)
         dates_for_dep = self.available_dates()
         if verified_dep_date not in dates_for_dep:
@@ -159,7 +165,7 @@ class FlightSearch:
                   '\nЕсли да - введите дату, если нет - нажмите Enter')
 
     def check_arr_date(self, date_from_user):
-        """Check for the presence of the input of arrival date"""
+        """Checks for the presence of the input of arrival date"""
         if not date_from_user:
             print('Ок! One-way ticket!\nИтак, что мы имеем...')
             self.check_if_oneway_flight()
@@ -175,7 +181,7 @@ class FlightSearch:
                 self.check_if_oneway_flight(one_way=False)
 
     def check_if_oneway_flight(self, one_way=True):
-        """Check return flight"""
+        """Checks if one-way flight and make some changes in main dict DATA for further using"""
         print('\n===============..Минутчку, пожалст..====================')
         if one_way:
             self.DATA['arr_date_for_url'] = ''
@@ -187,13 +193,12 @@ class FlightSearch:
             self.DATA['flag'] = 'rt'
 
     def change_data_dict(self):
-        """Меняем главный словарь с параметрами от юзера
-        для использования при поиске обратного полёта"""
+        """Changes main dict DATA for return flight search"""
         self.DATA['dep_city'], self.DATA['arr_city'] = self.DATA['arr_city'], self.DATA['dep_city']
         self.DATA['dep_date'], self.DATA['arr_date'] = self.DATA['arr_date'], self.DATA['dep_date']
 
     def prepare_finishing_flight_info(self, flight):
-        """Проверяем подходят ли данные о вылете под параметры юзера"""
+        """Checks if flight data getting from site is suitable for user's parameters"""
         finished_flight_info = dict()
         # время взлета в формате datetime
         finished_flight_info['dep_time'] = self.get_datetime_from_str(flight[0] + ' ' + flight[1])
@@ -212,9 +217,9 @@ class FlightSearch:
 
     def check_site_info(self, flight_info, price_info, relevant_list, all_list,
                         return_flight=False):
-        """Получаем 1 из 2 списков:
-        1) подходящих под параметры вылетов - relevant_list
-        2) и всех вылетов, прежложенных сайтом - all_list"""
+        """Gets one of two lists:
+        1) flights suitable for user's flight parameters - relevant_list
+        2) all flights offered by site - all_list"""
         # необработанные данные с сайта о вылетах в списке
         prepared_flights_info = []
         i = 0
@@ -244,16 +249,19 @@ class FlightSearch:
                 all_list.append(self.prepare_finishing_flight_info(flight))
 
     def print_flights_table(self, flights_list, header):
+        """Prints flight information in beautiful way"""
         table_for_suitable_flights = Texttable(max_width=100)
         table_for_suitable_flights.header(header)
         table_for_suitable_flights.add_rows(flights_list, header=False)
         print(table_for_suitable_flights.draw())
 
     def get_hhmm_ddmmyyyy_from_datetime(self, date):
+        """Converts datetime in HH:MM dd.mm.yyyy str-format"""
         return datetime.strftime(date, '%H:%M %d.%m.%Y')
 
     def show_suitable_flights(self, list_relevant, list_all):
-        """Проверяем, есть ли подходящие вылеты"""
+        """Checks if there are list with relevant flights or list with all offered flights
+        and prepares it to print."""
         # если подходящие вылеты были, выводим их на экран
         list_filtered = list()
         if list_relevant:
@@ -351,7 +359,8 @@ class FlightSearch:
                 self.print_flights_table(sorted_flight_list_of_lists, header)
 
     def start(self):
-        self.get_cities_from_user(input('* город отправления:\n'))
+        # self.get_cities_from_user(input('* город отправления:\n'))
+        self.get_cities_from_user()
         self.check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
         self.check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
 
@@ -366,7 +375,7 @@ class FlightSearch:
 
 if __name__ == '__main__':
 
-    print('\nСалют! Билеты на самолёт??\nПроще простого! Введите:\n')
+    print('\nСалют! Билеты на самолёт??\nПроще простого!\n')
     checker = FlightSearch()
     checker.start()
     print(checker)
