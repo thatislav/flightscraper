@@ -92,7 +92,7 @@ class FlightSearch:
             print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. '
                   .format(self.DATA, text))
             if len(cities_for_arr) == 1:
-                another_city = input('Если летим туда, нажмите Enter.'
+                another_city = input('Если летим туда, нажмите Enter.\n'
                                  '\nИначе выберите другой город из списка:\n{}\n'.
                                  format(self.DATA['cities_for_dep']))
                 if not another_city:
@@ -176,10 +176,10 @@ class FlightSearch:
                     '&rtdate=' + self.get_ddmmyyyy_from_datetime(self.DATA['arr_date'])
                 self.DATA['flag'] = 'rt'
 
-    def change_data_dict(self):
-        """Changes main dict DATA for return flight search"""
-        self.DATA['dep_city'], self.DATA['arr_city'] = self.DATA['arr_city'], self.DATA['dep_city']
-        self.DATA['dep_date'], self.DATA['arr_date'] = self.DATA['arr_date'], self.DATA['dep_date']
+    # def change_data_dict(self):
+    #     """Changes main dict DATA for return flight search"""
+    #     self.DATA['dep_city'], self.DATA['arr_city'] = self.DATA['arr_city'], self.DATA['dep_city']
+    #     self.DATA['dep_date'], self.DATA['arr_date'] = self.DATA['arr_date'], self.DATA['dep_date']
 
     def prepare_finishing_flight_info(self, flight):
         """Checks if flight data getting from site is suitable for user's parameters"""
@@ -201,6 +201,17 @@ class FlightSearch:
         finished_flight_info['to'] = self.get_city_with_regex(flight[4])
         return finished_flight_info
 
+    def prepare_cities_and_dates(self, return_flight):
+        dep_city = lambda return_flight: self.DATA['arr_city'] \
+            if return_flight else self.DATA['dep_city']
+        arr_city = lambda return_flight: self.DATA['dep_city'] \
+            if return_flight else self.DATA['arr_city']
+        dep_date = lambda return_flight: self.DATA['arr_date'] \
+            if return_flight else self.DATA['dep_date']
+        arr_date = lambda return_flight: self.DATA['dep_date'] \
+            if return_flight else self.DATA['arr_date']
+        return dep_city, arr_city, dep_date, arr_date
+
     def check_site_info(self, flight_info, price_info, relevant_list, all_list,
                         return_flight=False):
         """Gets one of two lists:
@@ -216,18 +227,22 @@ class FlightSearch:
                 for piece in element.xpath('./td/text()'):
                     prepared_flights_info[i].append(piece)
             i += 1
-        # если функция используется для проверки вылетов в обратном направлении (direction == 2),
-        # то правим словарь с параметрами вылета, чтобы по-прежнему можно пользоваться этой функцией
-        if return_flight:
-            self.change_data_dict()
-        # теперь отбираем из выдачи сайта (prepared_flights_info) -
-        # все подходящие под запрос юзера вылеты ТУДА в список словарей site_info_finished
+        # готовим параметры в соответствии с тем,
+        # используется функция для вылета ТУДА (return_flight=False)
+        # или ОБРАТНО (return_flight=True)
+        dep_city = lambda return_flight: self.DATA['arr_city'] \
+            if return_flight else self.DATA['dep_city']
+        arr_city = lambda return_flight: self.DATA['dep_city'] \
+            if return_flight else self.DATA['arr_city']
+        dep_date = lambda return_flight: self.DATA['arr_date'] \
+            if return_flight else self.DATA['dep_date']
+
         for flight in prepared_flights_info:
             # если вылет подходит под запрос юзера,
             # сохраняем его в соотв-щий список relevant_list
-            if (self.get_city_with_regex(flight[3]) == self.DATA['dep_city']) \
-                    and (self.get_city_with_regex(flight[4]) == self.DATA['arr_city']) \
-                    and (datetime.strptime(flight[0], '%a, %d %b %y') == self.DATA['dep_date']):
+            if (self.get_city_with_regex(flight[3]) == dep_city(return_flight))\
+                    and (self.get_city_with_regex(flight[4]) == arr_city(return_flight))\
+                    and (datetime.strptime(flight[0], '%a, %d %b %y') == dep_date(return_flight)):
                 relevant_list.append(self.prepare_finishing_flight_info(flight))
             # если вылет не подходит под запрос юзера,
             # тоже сохраняем его, но уже в список всех вылетов all_list
@@ -245,14 +260,21 @@ class FlightSearch:
         """Converts datetime in HH:MM dd.mm.yyyy str-format"""
         return datetime.strftime(date, '%H:%M %d.%m.%Y')
 
-    def show_suitable_flights(self, list_relevant, list_all):
+    def show_suitable_flights(self, list_relevant, list_all, return_flight=False):
         """Checks if there are list with relevant flights or list with all offered flights
         and prepares it to print."""
         # если подходящие вылеты были, выводим их на экран
         list_filtered = list()
+        # готовим параметры в соответствии с тем,
+        # используется функция для вылета ТУДА (return_flight=False)
+        # или ОБРАТНО (return_flight=True)
+        dep_city = lambda return_flight: self.DATA['arr_city'] \
+            if return_flight else self.DATA['dep_city']
+        arr_city = lambda return_flight: self.DATA['dep_city'] \
+            if return_flight else self.DATA['arr_city']
         if list_relevant:
-            print('\nДля маршрута из {0[dep_city]} в {0[arr_city]} нашлось следующее:'.
-                  format(self.DATA))
+            print('\nДля маршрута из {0} в {1} нашлось следующее:'.
+                  format(dep_city(return_flight), arr_city(return_flight)))
             header = 'Взлёт в:\tПосадка в:\tДлительность перелёта:\tЦена билета:'.split('\t')
             for flight in list_relevant:
                 flight_restruct = [self.get_hhmm_ddmmyyyy_from_datetime(flight['dep_time']),
@@ -264,8 +286,9 @@ class FlightSearch:
         # иначе выводим сообщение, что подходящих вылетов нет,
         # и на всякий выдаём инфу о всех предложенных сайтом вылетах
         else:
-            print('\nК сожалению, вылетов из {0[dep_city]} в {0[arr_city]} не нашлось.'
-                  '\nНо это только пока, не отчаивайтесь ;)'.format(self.DATA))
+            print('\nК сожалению, вылетов из {0} в {1} не нашлось.'
+                  '\nНо это только пока, не отчаивайтесь ;)'
+                  .format(dep_city(return_flight), arr_city(return_flight)))
             if list_all:
                 print('\nЗато есть вот такие варианты:\n')
                 header = \
@@ -301,7 +324,8 @@ class FlightSearch:
         if 'arr_date' in self.DATA.keys():
             self.check_site_info(info_arr, price_arr, self.arrival_list_relevant, arrival_list_all,
                                  return_flight=True)
-            self.show_suitable_flights(self.arrival_list_relevant, arrival_list_all)
+            self.show_suitable_flights(self.arrival_list_relevant, arrival_list_all,
+                                       return_flight=True)
 
     def final_checking(self):
         # если нашлись подходящие вылеты и ТУДА, и ОБРАТНО,
@@ -313,7 +337,7 @@ class FlightSearch:
             for dep_flight in self.departure_list_relevant:
                 for arr_flight in self.arrival_list_relevant:
                     if dep_flight['arr_time'] > arr_flight['dep_time']:
-                        print('После посадки в {0[dep_city]} в {1} '
+                        print('После посадки в {0[arr_city]} в {1} '
                               'обратным рейсом в {2} улететь уже невозможно.'.
                               format(self.DATA,
                                      self.get_hhmm_ddmmyyyy_from_datetime(dep_flight['arr_time']),
@@ -337,7 +361,7 @@ class FlightSearch:
                 sorted_flight_list_of_lists = \
                     [[v for v in flight_d.values()] for flight_d in sorted_flight_list_of_dicts]
                 header = \
-                    'Из {0[arr_city]} в {0[dep_city]}:\t' \
+                    'Из {0[dep_city]} в {0[arr_city]}:\t' \
                     'Назад:\t' \
                     'Итого в полёте(ЧЧ:ММ):\t' \
                     'Итого цена:'\
