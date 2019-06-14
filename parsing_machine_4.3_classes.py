@@ -366,8 +366,6 @@ class FlightSearch:
         self.get_cities_from_user()
         self.check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
         self.check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
-
-    def __str__(self):
         self.find_and_show_flights()
         self.final_checking()
         if self.departure_list_relevant:
@@ -381,4 +379,3 @@ if __name__ == '__main__':
     print('\nСалют! Билеты на самолёт??\nПроще простого!\n')
     checker = FlightSearch()
     checker.start()
-    print(checker)
