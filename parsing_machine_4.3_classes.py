@@ -28,11 +28,11 @@ class FlightSearch:
         else:
             return set(regex.findall(city))
 
-    def get_html_from_url(self, url, get=True, data=None, headers=None):
+    def get_html_from_url(self, url, get=True, params=None, data=None, headers=None):
         """Makes get or post request to url. Returns html-response"""
         try:
             if get:
-                response = requests.get(url)
+                response = requests.get(url, params=params)
             else:
                 response = requests.post(url, data=data, headers=headers)
         except:
@@ -42,7 +42,7 @@ class FlightSearch:
             if str(response.status_code) == '200':
                 return response
             else:
-                print('Что-то с сайтом... Попробуйте позже')
+                print('Что-то с ответом с сайта... Попробуйте позже')
                 sys.exit()
 
     def get_parsed_info(self, response):
@@ -117,8 +117,8 @@ class FlightSearch:
                 headers = {'Content-Type': 'application/x-www-form-urlencoded'}
                 # make post_request to site with selected cities, to know available dates
                 post_request = self.get_html_from_url('{[URL]}script/getdates/2-departure'.
-                                               format(self.DATA),
-                                               get=False, data=body, headers=headers)
+                                                      format(self.DATA),
+                                                      get=False, data=body, headers=headers)
                 raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', post_request.text))
                 dates_for_dep = \
                     [datetime.strptime(raw_date, '%Y,%m,%d') for raw_date in raw_dates_from_html]
@@ -162,8 +162,8 @@ class FlightSearch:
         if not date_from_user:
             print('Ок! One-way ticket!\nИтак, что мы имеем...')
             print('\n===============..Минутчку, пожалст..====================')
-            self.DATA['arr_date_for_url'] = ''
-            self.DATA['flag'] = 'ow'
+            self.DATA['arr_date_for_url'] = None
+            self.DATA['ow'] = ''
         else:
             verified_arr_date = self.get_date_in_format(date_from_user)
             dates_for_arr = self.available_dates(for_depart=False)
@@ -175,8 +175,8 @@ class FlightSearch:
                 self.DATA['arr_date'] = verified_arr_date
                 print('\n===============..Минутчку, пожалст..====================')
                 self.DATA['arr_date_for_url'] = \
-                    '&rtdate=' + self.get_ddmmyyyy_from_datetime(self.DATA['arr_date'])
-                self.DATA['flag'] = 'rt'
+                    self.get_ddmmyyyy_from_datetime(self.DATA['arr_date'])
+                self.DATA['rt'] = ''
 
     def prepare_finishing_flight_info(self, flight):
         """Checks if flight data getting from site is suitable for user's parameters"""
@@ -292,11 +292,17 @@ class FlightSearch:
 
     def find_and_show_flights(self):
         """Runs general flight information gathering and print it"""
-        r_final = self.get_html_from_url(
-            'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en'
-            '&depdate={0[dep_date_for_url]}&aptcode1={0[dep_city]}{0[arr_date_for_url]}'
-            '&aptcode2={0[arr_city]}&paxcount=1&infcount='.
-            format(self.DATA))
+        url = 'https://apps.penguin.bg/fly/quote3.aspx'
+        payload = {'ow': self.DATA.get('ow'),
+                   'rt': self.DATA.get('rt'),
+                   'lang': 'en',
+                   'depdate': self.DATA.get('dep_date_for_url'),
+                   'aptcode1': self.DATA.get('dep_city'),
+                   'rtdate': self.DATA.get('arr_date_for_url'),
+                   'aptcode2': self.DATA['arr_city'],
+                   'paxcount': 1,
+                   'infcount': ''}
+        r_final = self.get_html_from_url(url, params=payload)
         tree = self.get_parsed_info(r_final)
         info_dep = tree.xpath('//tr[starts-with(@id, "flywiz_rinf")]')
         price_dep = tree.xpath('//tr[starts-with(@id, "flywiz_rprc")]')
