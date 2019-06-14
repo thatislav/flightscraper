@@ -92,9 +92,11 @@ class FlightSearch:
             print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. '
                   .format(self.DATA, text))
             if len(cities_for_arr) == 1:
+                available_cities = self.DATA['cities_for_dep'][:]
+                available_cities.remove(self.DATA['dep_city'])
                 another_city = input('Если летим туда, нажмите Enter.\n'
                                  '\nИначе выберите другой город из списка:\n{}\n'.
-                                 format(self.DATA['cities_for_dep']))
+                                 format(available_cities))
                 if not another_city:
                     self.DATA['arr_city'] = text.upper()
                     print('* город прибытия - {[arr_city]}'.format(self.DATA))
@@ -201,16 +203,6 @@ class FlightSearch:
         """Gets one of two lists:
         1) flights suitable for user's flight parameters - relevant_list
         2) all flights offered by site - all_list"""
-        # необработанные данные с сайта о вылетах в списке
-        prepared_flights_info = []
-        i = 0
-        # наполняем необрабортанными данными список prepared_flights_info
-        for flight_variant in [full_info for full_info in zip(flight_info, price_info)]:
-            prepared_flights_info.append([])
-            for element in flight_variant:
-                for piece in element.xpath('./td/text()'):
-                    prepared_flights_info[i].append(piece)
-            i += 1
         # готовим параметры в соответствии с тем,
         # используется функция для вылета ТУДА (return_flight=False)
         # или ОБРАТНО (return_flight=True)
@@ -221,6 +213,16 @@ class FlightSearch:
         dep_date = lambda return_flight: self.DATA['arr_date'] \
             if return_flight else self.DATA['dep_date']
 
+        prepared_flights_info = []
+        i = 0
+        # приводим данные в удобный для дальнейшей обработки вид и
+        # наполняем ими список prepared_flights_info
+        for flight_variant in zip(flight_info, price_info):
+            prepared_flights_info.append([])
+            for element in flight_variant:
+                for piece in element.xpath('./td/text()'):
+                    prepared_flights_info[i].append(piece)
+            i += 1
         for flight in prepared_flights_info:
             # если вылет подходит под запрос юзера,
             # сохраняем его в соотв-щий список relevant_list
