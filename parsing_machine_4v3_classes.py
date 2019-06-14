@@ -7,49 +7,57 @@ import re
 import sys
 import requests
 from lxml import html
+from lxml.etree import ParseError, ParserError
 from texttable import Texttable
 
 
 class FlightSearch:
-
+    """Class for taking user's flight parameters,
+    checking it and provide filtered information about flights."""
     def __init__(self):
         # словарь с основными данными
-        self.DATA = {'URL': 'http://www.flybulgarien.dk/'}
+        self.data = {'URL': 'http://www.flybulgarien.dk/'}
         # список (словарей) релевантных вылетов ТУДА
         self.departure_list_relevant = []
         # список (словарей) релевантных вылетов ОБРАТНО
         self.arrival_list_relevant = []
 
-    def get_city_with_regex(self, city, search=True):
+    @staticmethod
+    def get_city_with_regex(city, search=True):
         """Pulls city-code or codes with regex"""
         regex = re.compile(r'[A-Z]{3}')
         if search:
             return regex.search(city).group()
-        else:
-            return set(regex.findall(city))
+        return set(regex.findall(city))
 
     def get_html_from_url(self, url, get=True, params=None, data=None, headers=None):
         """Makes get or post request to url. Returns html-response"""
+        exception_flag = False
         try:
             if get:
-                response = requests.get(url, params=params)
+                response = requests.get(url, params=params, timeout=120)
             else:
-                response = requests.post(url, data=data, headers=headers)
-        except:
-            print('Что-то с сайтом... Попробуйте позже')
-            sys.exit()
-        else:
+                response = requests.post(url, data=data, headers=headers, timeout=120)
             if str(response.status_code) == '200':
                 return response
-            else:
-                print('Что-то с ответом с сайта... Попробуйте позже')
-                sys.exit()
+            print('Что-то с ответом с сайта... Попробуйте позже')
+        except ConnectionError:
+            print('Что-то с соединением...')
+            exception_flag = True
+        except TimeoutError:
+            print('Вышло время ожидания ответа от сайта...')
+            exception_flag = True
+        finally:
+            if exception_flag:
+                decision = input('Нажмите "Enter", если хотите попробовать снова\n')
+                self.get_cities_from_user() if not decision else sys.exit()
 
-    def get_parsed_info(self, response):
+    @staticmethod
+    def get_parsed_info(response):
         """Parses html and returns single document"""
         try:
             parsed = html.fromstring(response.text)
-        except:
+        except (ParserError, ParseError):
             print('Что-то с парсингом html-страницы... Обратитесь к администратору программы')
             sys.exit()
         else:
@@ -57,49 +65,49 @@ class FlightSearch:
 
     def get_dep_cities(self):
         """Collects from site all available departure cities"""
-        get_request = self.get_html_from_url('{[URL]}en/'.format(self.DATA))
+        get_request = self.get_html_from_url('{[URL]}en/'.format(self.data))
         parsed = self.get_parsed_info(get_request)
         cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
         cities_for_dep = [self.get_city_with_regex(city) for city in cities_from_html]
-        self.DATA['cities_for_dep'] = cities_for_dep
+        self.data['cities_for_dep'] = cities_for_dep
 
     def checking_user_dep_city(self, city_from_user):
         """Checks if user's dep city is in available dep-cities"""
-        while city_from_user.upper() not in self.DATA['cities_for_dep']:
+        while city_from_user.upper() not in self.data['cities_for_dep']:
             city_from_user = input('Введите код города из списка:'
-                                   '\n{[cities_for_dep]}\n'.format(self.DATA))
-        self.DATA['dep_city'] = city_from_user.upper()
+                                   '\n{0[cities_for_dep]}\n'.format(self.data))
+        self.data['dep_city'] = city_from_user.upper()
 
     def get_arr_cities(self):
         """Checks where could to fly from chosen dep_city"""
         get_request = self.get_html_from_url('{0[URL]}script/getcity/2-{0[dep_city]}'.
-                                             format(self.DATA))
+                                             format(self.data))
         cities_for_arr = set(self.get_city_with_regex(get_request.text, search=False))
         return cities_for_arr
 
     def get_cities_from_user(self, city_from_user='plug'):
         """Checks for input accuracy of departure city"""
-        if 'cities_for_dep' not in self.DATA:
+        if 'cities_for_dep' not in self.data:
             self.get_dep_cities()
         self.checking_user_dep_city(city_from_user)
         cities_for_arr = self.get_arr_cities()
         if not cities_for_arr:
-            print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.format(self.DATA))
-            self.DATA['cities_for_dep'].remove(self.DATA['dep_city'])
+            print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.format(self.data))
+            self.data['cities_for_dep'].remove(self.data['dep_city'])
             self.get_cities_from_user(input('введите другой город: \n'))
         else:
             text = ' или '.join(cities_for_arr)
             print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. '
-                  .format(self.DATA, text))
+                  .format(self.data, text))
             if len(cities_for_arr) == 1:
-                available_cities = self.DATA['cities_for_dep'][:]
-                available_cities.remove(self.DATA['dep_city'])
+                available_cities = self.data['cities_for_dep'][:]
+                available_cities.remove(self.data['dep_city'])
                 another_city = input('Если летим туда, нажмите Enter.\n'
-                                 '\nИначе выберите другой город из списка:\n{}\n'.
-                                 format(available_cities))
+                                     '\nИначе выберите другой город из списка:\n{}\n'.
+                                     format(available_cities))
                 if not another_city:
-                    self.DATA['arr_city'] = text.upper()
-                    print('* город прибытия - {[arr_city]}'.format(self.DATA))
+                    self.data['arr_city'] = text.upper()
+                    print('* город прибытия - {[arr_city]}'.format(self.data))
                 else:
                     self.get_cities_from_user(another_city)
             else:
@@ -107,28 +115,28 @@ class FlightSearch:
                 while not city_from_user.upper() in cities_for_arr:
                     print(text)
                     city_from_user = input('\n* город прибытия: \n')
-                self.DATA['arr_city'] = city_from_user.upper()
+                self.data['arr_city'] = city_from_user.upper()
 
     def available_dates(self, for_depart=True):
         """Pulls out available dates"""
         if for_depart:  # Runs scenario for getting dates for departure
-            if 'dates_for_dep' not in self.DATA.keys():
-                body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(self.DATA)
+            if 'dates_for_dep' not in self.data.keys():
+                body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(self.data)
                 headers = {'Content-Type': 'application/x-www-form-urlencoded'}
                 # make post_request to site with selected cities, to know available dates
                 post_request = self.get_html_from_url('{[URL]}script/getdates/2-departure'.
-                                                      format(self.DATA),
+                                                      format(self.data),
                                                       get=False, data=body, headers=headers)
                 raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', post_request.text))
                 dates_for_dep = \
                     [datetime.strptime(raw_date, '%Y,%m,%d') for raw_date in raw_dates_from_html]
-                self.DATA['dates_for_dep'] = sorted(dates_for_dep)
-            return self.DATA['dates_for_dep']
+                self.data['dates_for_dep'] = sorted(dates_for_dep)
+            return self.data['dates_for_dep']
         # Runs scenario for getting dates for arrive
         # Arrival dates coming from site are the same as departure dates
-        self.DATA['dates_for_arr'] = \
-            [date for date in self.DATA['dates_for_dep'] if date >= self.DATA['dep_date']]
-        return self.DATA['dates_for_arr']
+        self.data['dates_for_arr'] = \
+            [date for date in self.data['dates_for_dep'] if date >= self.data['dep_date']]
+        return self.data['dates_for_arr']
 
     def get_date_in_format(self, date_from_user):
         """Checks for date input accuracy, and convert date into Datetime format"""
@@ -138,7 +146,8 @@ class FlightSearch:
             return self.get_date_in_format(input(
                 'Дата введена некорректно. Формат даты: "ДД.ММ.ГГГГ". Повторите ввод:\n'))
 
-    def get_ddmmyyyy_from_datetime(self, date):
+    @staticmethod
+    def get_ddmmyyyy_from_datetime(date):
         """Converts datetime to dd.mm.yyyy str-format"""
         return datetime.strftime(date, '%d.%m.%Y')
 
@@ -149,11 +158,10 @@ class FlightSearch:
         if verified_dep_date not in dates_for_dep:
             self.check_dep_date(input(
                 ' - для выбора доступна любая из этих дат:\n{}\nКакую выберЕте?\n'.
-                format([self.get_ddmmyyyy_from_datetime(date) for date in dates_for_dep]))
-            )
+                format([self.get_ddmmyyyy_from_datetime(date) for date in dates_for_dep])))
         else:
-            self.DATA['dep_date'] = verified_dep_date
-            self.DATA['dep_date_for_url'] = self.get_ddmmyyyy_from_datetime(self.DATA['dep_date'])
+            self.data['dep_date'] = verified_dep_date
+            self.data['dep_date_for_url'] = self.get_ddmmyyyy_from_datetime(self.data['dep_date'])
             print('\nСупер! Почти всё готово. Обратный билет будем брать?'
                   '\nЕсли да - введите дату, если нет - нажмите Enter')
 
@@ -162,8 +170,8 @@ class FlightSearch:
         if not date_from_user:
             print('Ок! One-way ticket!\nИтак, что мы имеем...')
             print('\n===============..Минутчку, пожалст..====================')
-            self.DATA['arr_date_for_url'] = None
-            self.DATA['ow'] = ''
+            self.data['arr_date_for_url'] = None
+            self.data['ow'] = ''
         else:
             verified_arr_date = self.get_date_in_format(date_from_user)
             dates_for_arr = self.available_dates(for_depart=False)
@@ -172,11 +180,11 @@ class FlightSearch:
                     ' - выберите любую из этих дат:\n{}\n'.
                     format([self.get_ddmmyyyy_from_datetime(date) for date in dates_for_arr])))
             else:
-                self.DATA['arr_date'] = verified_arr_date
+                self.data['arr_date'] = verified_arr_date
                 print('\n===============..Минутчку, пожалст..====================')
-                self.DATA['arr_date_for_url'] = \
-                    self.get_ddmmyyyy_from_datetime(self.DATA['arr_date'])
-                self.DATA['rt'] = ''
+                self.data['arr_date_for_url'] = \
+                    self.get_ddmmyyyy_from_datetime(self.data['arr_date'])
+                self.data['rt'] = ''
 
     def prepare_finishing_flight_info(self, flight):
         """Checks if flight data getting from site is suitable for user's parameters"""
@@ -206,12 +214,12 @@ class FlightSearch:
         # готовим параметры в соответствии с тем,
         # используется функция для вылета ТУДА (return_flight=False)
         # или ОБРАТНО (return_flight=True)
-        dep_city = lambda return_flight: self.DATA['arr_city'] \
-            if return_flight else self.DATA['dep_city']
-        arr_city = lambda return_flight: self.DATA['dep_city'] \
-            if return_flight else self.DATA['arr_city']
-        dep_date = lambda return_flight: self.DATA['arr_date'] \
-            if return_flight else self.DATA['dep_date']
+        dep_city = lambda return_flight: self.data['arr_city'] \
+            if return_flight else self.data['dep_city']
+        arr_city = lambda return_flight: self.data['dep_city'] \
+            if return_flight else self.data['arr_city']
+        dep_date = lambda return_flight: self.data['arr_date'] \
+            if return_flight else self.data['dep_date']
 
         prepared_flights_info = []
         i = 0
@@ -235,14 +243,16 @@ class FlightSearch:
             else:
                 all_list.append(self.prepare_finishing_flight_info(flight))
 
-    def print_flights_table(self, flights_list, header):
+    @staticmethod
+    def print_flights_table(flights_list, header):
         """Prints flight information in beautiful way"""
         table_for_suitable_flights = Texttable(max_width=100)
         table_for_suitable_flights.header(header)
         table_for_suitable_flights.add_rows(flights_list, header=False)
         print(table_for_suitable_flights.draw())
 
-    def get_hhmm_ddmmyyyy_from_datetime(self, date):
+    @staticmethod
+    def get_hhmm_ddmmyyyy_from_datetime(date):
         """Converts datetime in HH:MM dd.mm.yyyy str-format"""
         return datetime.strftime(date, '%H:%M %d.%m.%Y')
 
@@ -254,10 +264,10 @@ class FlightSearch:
         # готовим параметры в соответствии с тем,
         # используется функция для вылета ТУДА (return_flight=False)
         # или ОБРАТНО (return_flight=True)
-        dep_city = lambda return_flight: self.DATA['arr_city'] \
-            if return_flight else self.DATA['dep_city']
-        arr_city = lambda return_flight: self.DATA['dep_city'] \
-            if return_flight else self.DATA['arr_city']
+        dep_city = lambda return_flight: self.data['arr_city'] \
+            if return_flight else self.data['dep_city']
+        arr_city = lambda return_flight: self.data['dep_city'] \
+            if return_flight else self.data['arr_city']
         if list_relevant:
             print('\nДля маршрута из {0} в {1} нашлось следующее:'.
                   format(dep_city(return_flight), arr_city(return_flight)))
@@ -293,13 +303,13 @@ class FlightSearch:
     def find_and_show_flights(self):
         """Runs general flight information gathering and print it"""
         url = 'https://apps.penguin.bg/fly/quote3.aspx'
-        payload = {'ow': self.DATA.get('ow'),
-                   'rt': self.DATA.get('rt'),
+        payload = {'ow': self.data.get('ow'),
+                   'rt': self.data.get('rt'),
                    'lang': 'en',
-                   'depdate': self.DATA.get('dep_date_for_url'),
-                   'aptcode1': self.DATA.get('dep_city'),
-                   'rtdate': self.DATA.get('arr_date_for_url'),
-                   'aptcode2': self.DATA['arr_city'],
+                   'depdate': self.data.get('dep_date_for_url'),
+                   'aptcode1': self.data.get('dep_city'),
+                   'rtdate': self.data.get('arr_date_for_url'),
+                   'aptcode2': self.data['arr_city'],
                    'paxcount': 1,
                    'infcount': ''}
         r_final = self.get_html_from_url(url, params=payload)
@@ -314,16 +324,15 @@ class FlightSearch:
         arrival_list_all = []
         self.check_site_info(info_dep, price_dep, self.departure_list_relevant, departure_list_all)
         self.show_suitable_flights(self.departure_list_relevant, departure_list_all)
-        if 'arr_date' in self.DATA.keys():
+        if 'arr_date' in self.data.keys():
             self.check_site_info(info_arr, price_arr, self.arrival_list_relevant, arrival_list_all,
                                  return_flight=True)
             self.show_suitable_flights(self.arrival_list_relevant, arrival_list_all,
                                        return_flight=True)
 
     def final_checking(self):
-        # если нашлись подходящие вылеты и ТУДА, и ОБРАТНО,
-        # то считаем все возможные варианты пар ТУДА-ОБРАТНО,
-        # сортируем по общей стоимости, выводим на экран
+        """Calculates all available variants of back and forth flights if there are,
+        sorts them by total price and prints."""
         if self.departure_list_relevant and self.arrival_list_relevant:
             print('\n' + (36 * '=') + ' ИТОГО ' + (36 * '=') + '\n')
             flight_list_of_dicts = []
@@ -332,7 +341,7 @@ class FlightSearch:
                     if dep_flight['arr_time'] > arr_flight['dep_time']:
                         print('После посадки в {0[arr_city]} в {1} '
                               'обратным рейсом в {2} улететь уже невозможно.'.
-                              format(self.DATA,
+                              format(self.data,
                                      self.get_hhmm_ddmmyyyy_from_datetime(dep_flight['arr_time']),
                                      self.get_hhmm_ddmmyyyy_from_datetime(arr_flight['dep_time'])))
                         continue
@@ -358,11 +367,11 @@ class FlightSearch:
                     'Назад:\t' \
                     'Итого в полёте(ЧЧ:ММ):\t' \
                     'Итого цена:'\
-                    .format(self.DATA).split('\t')
+                    .format(self.data).split('\t')
                 self.print_flights_table(sorted_flight_list_of_lists, header)
 
     def start(self):
-        # self.get_cities_from_user(input('* город отправления:\n'))
+        """Main method that runs others."""
         self.get_cities_from_user()
         self.check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
         self.check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
@@ -370,12 +379,11 @@ class FlightSearch:
         self.final_checking()
         if self.departure_list_relevant:
             return '\nСчастливого пути! :)'
-        else:
-            return '\nКто ищет, тот всегда найдёт! :)'
+        return '\nКто ищет, тот всегда найдёт! :)'
 
 
 if __name__ == '__main__':
 
     print('\nСалют! Билеты на самолёт??\nПроще простого!\n')
-    checker = FlightSearch()
-    checker.start()
+    CHECKER = FlightSearch()
+    CHECKER.start()

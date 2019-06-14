@@ -130,7 +130,6 @@ def check_if_oneway_flight(one_way=True):
     if one_way:
         DATA['arr_date_for_url'] = ''
         DATA['flag'] = 'ow'
-        # DATA['arr_date'] = ''
     else:
         DATA['arr_date_for_url'] = '&rtdate=' + get_ddmmyyyy_from_datetime(DATA['arr_date'])
         DATA['flag'] = 'rt'
