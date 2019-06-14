@@ -290,7 +290,8 @@ class FlightSearch:
                     list_filtered.append(flight_restruct)
                 self.print_flights_table(list_filtered, header)
 
-    def checking_everything(self):
+    def find_and_show_flights(self):
+        """Runs general flight information gathering and print it"""
         r_final = self.get_html_from_url(
             'https://apps.penguin.bg/fly/quote3.aspx?{0[flag]}=&lang=en'
             '&depdate={0[dep_date_for_url]}&aptcode1={0[dep_city]}{0[arr_date_for_url]}'
@@ -361,7 +362,7 @@ class FlightSearch:
         self.check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
 
     def __str__(self):
-        self.checking_everything()
+        self.find_and_show_flights()
         self.final_checking()
         if self.departure_list_relevant:
             return '\nСчастливого пути! :)'
