@@ -89,7 +89,15 @@ class FlightSearch:
         except (JSONDecodeError, UnicodeDecodeError):
             print('Something wrong with json-answer in available arr cities')
             sys.exit()
+        if not cities_for_arr:
+            print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.format(self.data))
+            self.data['cities_for_dep'].remove(self.data['dep_city'])
+            self.get_cities_from_user(input('введите другой город: \n'))
         else:
+            self.data['cities_for_arr'] = cities_for_arr
+            cities_for_arr = ' или '.join(cities_for_arr)
+            print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. '
+                  .format(self.data, cities_for_arr))
             return cities_for_arr
 
     def get_cities_from_user(self, city_from_user='plug'):
@@ -98,31 +106,23 @@ class FlightSearch:
             self.get_dep_cities()
         self.checking_user_dep_city(city_from_user)
         cities_for_arr = self.get_arr_cities()
-        if not cities_for_arr:
-            print('..самолёты из {[dep_city]}, к сожалению, никуда не летают..'.format(self.data))
-            self.data['cities_for_dep'].remove(self.data['dep_city'])
-            self.get_cities_from_user(input('введите другой город: \n'))
-        else:
-            text = ' или '.join(cities_for_arr)
-            print('\nПрекрасно! Самолётом из {0[dep_city]} можно добраться до {1}. '
-                  .format(self.data, text))
-            if len(cities_for_arr) == 1:
-                available_cities = self.data['cities_for_dep'][:]
-                available_cities.remove(self.data['dep_city'])
-                another_city = input('Если летим туда, нажмите Enter.\n'
-                                     '\nИначе выберите другой город из списка:\n{}\n'.
-                                     format(available_cities))
-                if not another_city:
-                    self.data['arr_city'] = text.upper()
-                    print('* город прибытия - {[arr_city]}'.format(self.data))
-                else:
-                    self.get_cities_from_user(another_city)
+        if len(self.data['cities_for_arr']) == 1:
+            available_cities = self.data['cities_for_dep'][:]
+            available_cities.remove(self.data['dep_city'])
+            another_city = input('Если летим туда, нажмите Enter.\n'
+                                 '\nИначе выберите другой город из списка:\n{}\n'.
+                                 format(available_cities))
+            if not another_city:
+                self.data['arr_city'] = cities_for_arr.upper()
+                print('* город прибытия - {[arr_city]}'.format(self.data))
             else:
-                city_from_user = input('\n* город прибытия:\n')
-                while not city_from_user.upper() in cities_for_arr:
-                    print(text)
-                    city_from_user = input('\n* город прибытия: \n')
-                self.data['arr_city'] = city_from_user.upper()
+                self.get_cities_from_user(another_city)
+        else:
+            city_from_user = input('\n* город прибытия:\n')
+            while not city_from_user.upper() in self.data['cities_for_arr']:
+                print(cities_for_arr)
+                city_from_user = input('\n* город прибытия: \n')
+            self.data['arr_city'] = city_from_user.upper()
 
     def available_dates(self, for_depart=True):
         """Pulls out available dates"""
