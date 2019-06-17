@@ -221,12 +221,14 @@ class FlightSearch:
         # готовим параметры в соответствии с тем,
         # используется функция для вылета ТУДА (return_flight=False)
         # или ОБРАТНО (return_flight=True)
-        dep_city = lambda return_flight: self.data['arr_city'] \
-            if return_flight else self.data['dep_city']
-        arr_city = lambda return_flight: self.data['dep_city'] \
-            if return_flight else self.data['arr_city']
-        dep_date = lambda return_flight: self.data['arr_date'] \
-            if return_flight else self.data['dep_date']
+        if return_flight:
+            dep_city = self.data['arr_city']
+            arr_city = self.data['dep_city']
+            dep_date = self.data['arr_date']
+        else:
+            dep_city = self.data['dep_city']
+            arr_city = self.data['arr_city']
+            dep_date = self.data['dep_date']
 
         prepared_flights_info = []
         # приводим данные в удобный для дальнейшей обработки вид и
@@ -239,9 +241,9 @@ class FlightSearch:
         for flight in prepared_flights_info:
             # если вылет подходит под запрос юзера,
             # сохраняем его в соотв-щий список relevant_list
-            if (self.get_city_with_regex(flight[3]) == dep_city(return_flight))\
-                    and (self.get_city_with_regex(flight[4]) == arr_city(return_flight))\
-                    and (datetime.strptime(flight[0], '%a, %d %b %y') == dep_date(return_flight)):
+            if (self.get_city_with_regex(flight[3]) == dep_city)\
+                    and (self.get_city_with_regex(flight[4]) == arr_city)\
+                    and (datetime.strptime(flight[0], '%a, %d %b %y') == dep_date):
                 relevant_list.append(self.prepare_finishing_flight_info(flight))
             # если вылет не подходит под запрос юзера,
             # тоже сохраняем его, но уже в список всех вылетов all_list
