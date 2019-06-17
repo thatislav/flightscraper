@@ -5,6 +5,7 @@ with parameters taken from user
 from datetime import datetime, timedelta
 import re
 import sys
+from json.decoder import JSONDecodeError
 import requests
 from lxml import html
 from lxml.etree import ParseError, ParserError
@@ -82,8 +83,14 @@ class FlightSearch:
         """Checks where could to fly from chosen dep_city"""
         get_request = self.get_html_from_url('{0[URL]}script/getcity/2-{0[dep_city]}'.
                                              format(self.data))
-        cities_for_arr = set(self.get_city_with_regex(get_request.text, search=False))
-        return cities_for_arr
+        # cities_for_arr = set(self.get_city_with_regex(get_request.text, search=False))
+        try:
+            cities_for_arr = [city for city in get_request.json()]
+        except (JSONDecodeError, UnicodeDecodeError):
+            print('Something wrong with json-answer in available arr cities')
+            sys.exit()
+        else:
+            return cities_for_arr
 
     def get_cities_from_user(self, city_from_user='plug'):
         """Checks for input accuracy of departure city"""
@@ -280,7 +287,7 @@ class FlightSearch:
         # иначе выводим сообщение, что подходящих вылетов нет,
         # и на всякий выдаём инфу о всех предложенных сайтом вылетах
         else:
-            print('\nК сожалению, вылетов из {0} в {1} не нашлось.'
+            print('\nК сожалению, вылетов из {0} в {1} на указанную дату не нашлось.'
                   '\nНо это только пока, не отчаивайтесь ;)'
                   .format(dep_city(return_flight), arr_city(return_flight)))
             if list_all:
