@@ -50,19 +50,22 @@ class FlightSearch:
             exception_flag = True
         finally:
             if exception_flag:
-                decision = input('Нажмите "Enter", если хотите попробовать снова\n')
-                self.get_cities_from_user() if not decision else sys.exit()
+                sys.exit()
 
     @staticmethod
     def get_parsed_info(response):
         """Parses html and returns single document"""
+        exception_flag = False
         try:
             parsed = html.fromstring(response.text)
         except (ParserError, ParseError, LxmlError):
             print('Что-то с парсингом html-страницы... Обратитесь к администратору программы')
-            sys.exit()
+            exception_flag = True
         else:
             return parsed
+        finally:
+            if exception_flag:
+                sys.exit()
 
     def get_dep_cities(self):
         """Collects from site all available departure cities"""
