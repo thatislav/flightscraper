@@ -222,15 +222,13 @@ class FlightSearch:
             if return_flight else self.data['dep_date']
 
         prepared_flights_info = []
-        i = 0
         # приводим данные в удобный для дальнейшей обработки вид и
         # наполняем ими список prepared_flights_info
-        for flight_variant in zip(flight_info, price_info):
+        for i, flight_variant in enumerate(zip(flight_info, price_info)):
             prepared_flights_info.append([])
             for element in flight_variant:
                 for piece in element.xpath('./td/text()'):
                     prepared_flights_info[i].append(piece)
-            i += 1
         for flight in prepared_flights_info:
             # если вылет подходит под запрос юзера,
             # сохраняем его в соотв-щий список relevant_list
@@ -378,8 +376,9 @@ class FlightSearch:
         self.find_and_show_flights()
         self.final_checking()
         if self.departure_list_relevant:
-            return '\nСчастливого пути! :)'
-        return '\nКто ищет, тот всегда найдёт! :)'
+            print('\nСчастливого пути! :)')
+        else:
+            print('\nКто ищет, тот всегда найдёт! :)')
 
 
 if __name__ == '__main__':
