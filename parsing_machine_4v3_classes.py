@@ -8,7 +8,7 @@ import sys
 from json.decoder import JSONDecodeError
 import requests
 from lxml import html
-from lxml.etree import ParseError, ParserError
+from lxml.etree import ParseError, ParserError, LxmlError
 from texttable import Texttable
 
 
@@ -58,7 +58,7 @@ class FlightSearch:
         """Parses html and returns single document"""
         try:
             parsed = html.fromstring(response.text)
-        except (ParserError, ParseError):
+        except (ParserError, ParseError, LxmlError):
             print('Что-то с парсингом html-страницы... Обратитесь к администратору программы')
             sys.exit()
         else:
