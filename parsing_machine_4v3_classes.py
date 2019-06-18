@@ -80,7 +80,6 @@ class FlightSearch:
         """Checks where could to fly from chosen dep_city"""
         get_request = self.get_html_from_url('GET', '{0[URL]}script/getcity/2-{0[dep_city]}'.
                                              format(self.data))
-        # cities_for_arr = set(self.get_city_with_regex(get_request.text, search=False))
         try:
             cities_for_arr = [city for city in get_request.json()]
         except (JSONDecodeError, UnicodeDecodeError):
@@ -267,13 +266,14 @@ class FlightSearch:
         # готовим параметры в соответствии с тем,
         # используется функция для вылета ТУДА (return_flight=False)
         # или ОБРАТНО (return_flight=True)
-        dep_city = lambda return_flight: self.data['arr_city'] \
-            if return_flight else self.data['dep_city']
-        arr_city = lambda return_flight: self.data['dep_city'] \
-            if return_flight else self.data['arr_city']
+        if return_flight:
+            dep_city = self.data['arr_city']
+            arr_city = self.data['dep_city']
+        else:
+            dep_city = self.data['dep_city']
+            arr_city = self.data['arr_city']
         if list_relevant:
-            print('\nДля маршрута из {0} в {1} нашлось следующее:'.
-                  format(dep_city(return_flight), arr_city(return_flight)))
+            print('\nДля маршрута из {0} в {1} нашлось следующее:'.format(dep_city, arr_city))
             header = 'Взлёт в:\tПосадка в:\tДлительность перелёта:\tЦена билета:'.split('\t')
             for flight in list_relevant:
                 flight_restruct = [self.get_hhmm_ddmmyyyy_from_datetime(flight['dep_time']),
@@ -286,8 +286,7 @@ class FlightSearch:
         # и на всякий выдаём инфу о всех предложенных сайтом вылетах
         else:
             print('\nК сожалению, вылетов из {0} в {1} на указанную дату не нашлось.'
-                  '\nНо это только пока, не отчаивайтесь ;)'
-                  .format(dep_city(return_flight), arr_city(return_flight)))
+                  '\nНо это только пока, не отчаивайтесь ;)'.format(dep_city, arr_city))
             if list_all:
                 print('\nЗато есть вот такие варианты:\n')
                 header = \
