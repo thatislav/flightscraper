@@ -332,7 +332,7 @@ class FlightSearch:
             self.show_suitable_flights(self.arrival_list_relevant, arrival_list_all,
                                        return_flight=True)
 
-    def final_checking(self):
+    def show_round_trip_flights(self):
         """Calculates all available variants of back and forth flights if there are,
         sorts them by total price and prints."""
         if self.departure_list_relevant and self.arrival_list_relevant:
@@ -378,7 +378,7 @@ class FlightSearch:
         self.check_dep_date(input('\n* дата вылета (ДД.ММ.ГГГГ):\n'))
         self.check_arr_date(input('\n* дата возврата (необязательно) (ДД.ММ.ГГГГ):\n'))
         self.find_and_show_flights()
-        self.final_checking()
+        self.show_round_trip_flights()
         if self.departure_list_relevant:
             print('\nСчастливого пути! :)')
         else:
