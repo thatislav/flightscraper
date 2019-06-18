@@ -31,16 +31,13 @@ class FlightSearch:
             return regex.search(city).group()
         return set(regex.findall(city))
 
-    # def get_html_from_url(self, url, get=True, params=None, data=None, headers=None):
-    def get_html_from_url(self, method, url, params=None, data=None, headers=None):
+    @staticmethod
+    def get_html_from_url(method, url, params=None, data=None, headers=None):
         """Makes get or post request to url. Returns html-response"""
         exception_flag = False
         try:
-            response = requests.request(method, url,
-                                        params=params, data=data, headers=headers, timeout=120)
-            if str(response.status_code) == '200':
-                return response
-            print('Что-то с ответом с сайта... Попробуйте позже')
+            return requests.request(method, url,
+                                    params=params, data=data, headers=headers, timeout=120)
         except ConnectionError:
             print('Что-то с соединением...')
             exception_flag = True
@@ -56,12 +53,10 @@ class FlightSearch:
         """Parses html and returns single document"""
         exception_flag = False
         try:
-            parsed = html.fromstring(response.text)
+            return html.fromstring(response.text)
         except (ParserError, ParseError, LxmlError):
             print('Что-то с парсингом html-страницы... Обратитесь к администратору программы')
             exception_flag = True
-        else:
-            return parsed
         finally:
             if exception_flag:
                 sys.exit()
