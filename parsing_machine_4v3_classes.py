@@ -31,14 +31,13 @@ class FlightSearch:
             return regex.search(city).group()
         return set(regex.findall(city))
 
-    def get_html_from_url(self, url, get=True, params=None, data=None, headers=None):
+    # def get_html_from_url(self, url, get=True, params=None, data=None, headers=None):
+    def get_html_from_url(self, method, url, params=None, data=None, headers=None):
         """Makes get or post request to url. Returns html-response"""
         exception_flag = False
         try:
-            if get:
-                response = requests.get(url, params=params, timeout=120)
-            else:
-                response = requests.post(url, data=data, headers=headers, timeout=120)
+            response = requests.request(method, url,
+                                        params=params, data=data, headers=headers, timeout=120)
             if str(response.status_code) == '200':
                 return response
             print('Что-то с ответом с сайта... Попробуйте позже')
@@ -69,7 +68,7 @@ class FlightSearch:
 
     def get_dep_cities(self):
         """Collects from site all available departure cities"""
-        get_request = self.get_html_from_url('{[URL]}en/'.format(self.data))
+        get_request = self.get_html_from_url('GET', '{[URL]}en/'.format(self.data))
         parsed = self.get_parsed_info(get_request)
         cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
         cities_for_dep = [self.get_city_with_regex(city) for city in cities_from_html]
@@ -84,7 +83,7 @@ class FlightSearch:
 
     def get_arr_cities(self):
         """Checks where could to fly from chosen dep_city"""
-        get_request = self.get_html_from_url('{0[URL]}script/getcity/2-{0[dep_city]}'.
+        get_request = self.get_html_from_url('GET', '{0[URL]}script/getcity/2-{0[dep_city]}'.
                                              format(self.data))
         # cities_for_arr = set(self.get_city_with_regex(get_request.text, search=False))
         try:
@@ -134,9 +133,8 @@ class FlightSearch:
                 body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(self.data)
                 headers = {'Content-Type': 'application/x-www-form-urlencoded'}
                 # make post_request to site with selected cities, to know available dates
-                post_request = self.get_html_from_url('{[URL]}script/getdates/2-departure'.
-                                                      format(self.data),
-                                                      get=False, data=body, headers=headers)
+                post_request = self.get_html_from_url('POST', '{[URL]}script/getdates/2-departure'.
+                                                      format(self.data), data=body, headers=headers)
                 raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', post_request.text))
                 dates_for_dep = \
                     [datetime.strptime(raw_date, '%Y,%m,%d') for raw_date in raw_dates_from_html]
@@ -322,7 +320,7 @@ class FlightSearch:
                    'aptcode2': self.data['arr_city'],
                    'paxcount': 1,
                    'infcount': ''}
-        r_final = self.get_html_from_url(url, params=payload)
+        r_final = self.get_html_from_url('GET', url, params=payload)
         tree = self.get_parsed_info(r_final)
         info_dep = tree.xpath('//tr[starts-with(@id, "flywiz_rinf")]')
         price_dep = tree.xpath('//tr[starts-with(@id, "flywiz_rprc")]')
