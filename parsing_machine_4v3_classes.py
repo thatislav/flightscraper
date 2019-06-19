@@ -97,8 +97,8 @@ class FlightSearch:
 
         Writes departure cities into self.data['cities_for_dep'].
         """
-        get_request = self.get_html_from_url('GET', '{[URL]}en/'.format(self.data))
-        parsed = self.get_parsed_info(get_request)
+        response = self.get_html_from_url('GET', '{[URL]}en/'.format(self.data))
+        parsed = self.get_parsed_info(response)
         cities_from_html = parsed.xpath('//*[@id="departure-city"]/option[@value]/text()')
         cities_for_dep = [self.get_city_with_regex(city) for city in cities_from_html]
         self.data['cities_for_dep'] = cities_for_dep
@@ -122,10 +122,10 @@ class FlightSearch:
         Writes available arrival cities into self.data['cities_for_arr'].
         Returns string with them.
         """
-        get_request = self.get_html_from_url('GET', '{0[URL]}script/getcity/2-{0[dep_city]}'.
+        response = self.get_html_from_url('GET', '{0[URL]}script/getcity/2-{0[dep_city]}'.
                                              format(self.data))
         try:
-            cities_for_arr = [city for city in get_request.json()]
+            cities_for_arr = [city for city in response.json()]
         except (JSONDecodeError, UnicodeDecodeError):
             print('Something wrong with json-answer in available arr cities')
             sys.exit()
@@ -186,9 +186,9 @@ class FlightSearch:
                 body = 'code1={0[dep_city]}&code2={0[arr_city]}'.format(self.data)
                 headers = {'Content-Type': 'application/x-www-form-urlencoded'}
                 # make post_request to site with selected cities, to know available dates
-                post_request = self.get_html_from_url('POST', '{[URL]}script/getdates/2-departure'.
+                response = self.get_html_from_url('POST', '{[URL]}script/getdates/2-departure'.
                                                       format(self.data), data=body, headers=headers)
-                raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', post_request.text))
+                raw_dates_from_html = set(re.findall(r'(\d{4},\d{1,2},\d{1,2})', response.text))
                 dates_for_dep = \
                     [datetime.strptime(raw_date, '%Y,%m,%d') for raw_date in raw_dates_from_html]
                 self.data['dates_for_dep'] = sorted(dates_for_dep)
