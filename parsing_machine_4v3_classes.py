@@ -66,19 +66,15 @@ class FlightSearch:
 
         Returns 'Response' object mentioned in requests lib.
         """
-        exception_flag = False
         try:
             return requests.request(method, url,
                                     params=params, data=data, headers=headers, timeout=120)
         except ConnectionError:
             print('Что-то с соединением...')
-            exception_flag = True
+            sys.exit()
         except TimeoutError:
             print('Вышло время ожидания ответа от сайта...')
-            exception_flag = True
-        finally:
-            if exception_flag:
-                sys.exit()
+            sys.exit()
 
     @staticmethod
     def get_parsed_info(response):
@@ -90,15 +86,11 @@ class FlightSearch:
 
         Returns parsed html-document.
         """
-        exception_flag = False
         try:
             return html.fromstring(response.text)
         except (ParserError, ParseError, LxmlError):
             print('Что-то с парсингом html-страницы... Обратитесь к администратору программы')
-            exception_flag = True
-        finally:
-            if exception_flag:
-                sys.exit()
+            sys.exit()
 
     def get_dep_cities(self):
         """Collect from site all available departure cities.
