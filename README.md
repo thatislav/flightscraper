@@ -1,2 +1,1 @@
-# Artezio
-Projects for Artezio
+# Scraper (parcer) for flight information
