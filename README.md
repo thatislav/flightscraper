@@ -1,1 +1,1 @@
-# Scraper (parcer) for flight information
+# Scraper (parser) for flight information
